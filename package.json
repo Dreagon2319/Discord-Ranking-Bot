@@ -1,0 +1,12 @@
+{
+  "name": "ranking-bot",
+  "version": "1.0.0",
+  "description": "Discord Ranking Bot",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.24.2"
+  }
+}
