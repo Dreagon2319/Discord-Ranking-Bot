@@ -10,6 +10,7 @@
     "node": "22.x"
   },
   "dependencies": {
-    "discord.js": "^14.24.2"
+    "discord.js": "^14.24.2",
+    "ws": "^8.18.3"
   }
 }
