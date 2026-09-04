@@ -14,24 +14,28 @@ const {
 
 const fs = require("fs");
 const http = require("http");
+const https = require("https");
 
 /*
 ==================================================
-ENVIRONMENT VARIABLES
+CONFIGURATION
 ==================================================
 */
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
-const PORT = process.env.PORT || 10000;
+const PORT = Number(process.env.PORT) || 10000;
+
+const DATA_FILE = "./data.json";
 
 console.log("========================================");
-console.log("RANKING BOT STARTING");
+console.log("        RANKING BOT STARTING");
 console.log("========================================");
 console.log("Client ID:", CLIENT_ID || "MISSING");
 console.log("Discord token:", TOKEN ? "FOUND" : "MISSING");
 console.log("Token length:", TOKEN ? TOKEN.length : 0);
 console.log("Render port:", PORT);
+console.log("Node version:", process.version);
 console.log("========================================");
 
 if (!TOKEN) {
@@ -72,12 +76,14 @@ DATA STORAGE
 ==================================================
 */
 
-const DATA_FILE = "./data.json";
-
 function loadData() {
     try {
         if (!fs.existsSync(DATA_FILE)) {
-            fs.writeFileSync(DATA_FILE, "{}");
+            fs.writeFileSync(
+                DATA_FILE,
+                "{}",
+                "utf8"
+            );
         }
 
         const raw = fs.readFileSync(
@@ -89,22 +95,46 @@ function loadData() {
             return {};
         }
 
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+
+        if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            Array.isArray(parsed)
+        ) {
+            console.error(
+                "data.json contains invalid data. Starting fresh."
+            );
+
+            return {};
+        }
+
+        return parsed;
 
     } catch (error) {
-        console.error("Could not load data:", error);
+        console.error(
+            "Could not load data.json:"
+        );
+
+        console.error(error);
+
         return {};
     }
 }
 
-function saveData(data) {
+function saveData() {
     try {
         fs.writeFileSync(
             DATA_FILE,
-            JSON.stringify(data, null, 2)
+            JSON.stringify(data, null, 2),
+            "utf8"
         );
     } catch (error) {
-        console.error("Could not save data:", error);
+        console.error(
+            "Could not save data.json:"
+        );
+
+        console.error(error);
     }
 }
 
@@ -122,20 +152,41 @@ function getServerData(guildId) {
             requests: {}
         };
 
-        saveData(data);
+        saveData();
     }
 
-    if (!data[guildId].requests) {
-        data[guildId].requests = {};
-        saveData(data);
+    const server = data[guildId];
+
+    if (!server.requests) {
+        server.requests = {};
     }
 
-    if (!Array.isArray(data[guildId].rankings)) {
-        data[guildId].rankings = [];
-        saveData(data);
+    if (!Array.isArray(server.rankings)) {
+        server.rankings = [];
     }
 
-    return data[guildId];
+    if (!Object.prototype.hasOwnProperty.call(
+        server,
+        "managerRoleId"
+    )) {
+        server.managerRoleId = null;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(
+        server,
+        "rankingChannelId"
+    )) {
+        server.rankingChannelId = null;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(
+        server,
+        "rankingMessageId"
+    )) {
+        server.rankingMessageId = null;
+    }
+
+    return server;
 }
 
 /*
@@ -159,6 +210,10 @@ SLASH COMMANDS
 
 const commands = [
 
+    /*
+    /setrole
+    */
+
     new SlashCommandBuilder()
         .setName("setrole")
         .setDescription(
@@ -173,6 +228,10 @@ const commands = [
         .setDefaultMemberPermissions(
             PermissionFlagsBits.Administrator
         ),
+
+    /*
+    /setchannel
+    */
 
     new SlashCommandBuilder()
         .setName("setchannel")
@@ -192,6 +251,10 @@ const commands = [
             PermissionFlagsBits.Administrator
         ),
 
+    /*
+    /requestrank
+    */
+
     new SlashCommandBuilder()
         .setName("requestrank")
         .setDescription(
@@ -206,9 +269,7 @@ const commands = [
         .addIntegerOption(option =>
             option
                 .setName("rank")
-                .setDescription(
-                    "Requested rank (1-10)"
-                )
+                .setDescription("Requested rank 1-10")
                 .setMinValue(1)
                 .setMaxValue(10)
                 .setRequired(true)
@@ -216,9 +277,7 @@ const commands = [
         .addStringOption(option =>
             option
                 .setName("type")
-                .setDescription(
-                    "Ranking change type"
-                )
+                .setDescription("Ranking change type")
                 .addChoices(
                     {
                         name: "Between",
@@ -240,13 +299,81 @@ const rest = new REST({
 
 /*
 ==================================================
+DISCORD API CONNECTIVITY TEST
+==================================================
+*/
+
+function testDiscordAPI() {
+
+    return new Promise(resolve => {
+
+        console.log(
+            "Testing connection to Discord API..."
+        );
+
+        const request = https.get(
+            "https://discord.com/api/v10/gateway",
+            response => {
+
+                console.log(
+                    "Discord API HTTP status:",
+                    response.statusCode
+                );
+
+                response.resume();
+
+                response.on("end", () => {
+
+                    console.log(
+                        "Discord API connectivity test finished."
+                    );
+
+                    resolve(true);
+                });
+            }
+        );
+
+        request.setTimeout(
+            10000,
+            () => {
+
+                console.error(
+                    "Discord API connectivity test timed out after 10 seconds."
+                );
+
+                request.destroy();
+
+                resolve(false);
+            }
+        );
+
+        request.on(
+            "error",
+            error => {
+
+                console.error(
+                    "Discord API connectivity test failed:"
+                );
+
+                console.error(error);
+
+                resolve(false);
+            }
+        );
+    });
+}
+
+/*
+==================================================
 REGISTER SLASH COMMANDS
 ==================================================
 */
 
 async function registerCommands() {
 
-    console.log("Registering slash commands...");
+    console.log(
+        "Registering slash commands..."
+    );
 
     try {
 
@@ -263,6 +390,8 @@ async function registerCommands() {
             "Slash commands registered successfully."
         );
 
+        return true;
+
     } catch (error) {
 
         console.error(
@@ -270,6 +399,8 @@ async function registerCommands() {
         );
 
         console.error(error);
+
+        return false;
     }
 }
 
@@ -292,14 +423,20 @@ async function createRandomRanking(guild) {
     } catch (error) {
 
         console.error(
-            `Could not fetch members for ${guild.name}:`,
-            error
+            `Could not fetch members for ${guild.name}:`
         );
+
+        console.error(error);
     }
 
     const members = [
         ...guild.members.cache.values()
-    ].filter(member => !member.user.bot);
+    ].filter(member => {
+
+        return (
+            !member.user.bot
+        );
+    });
 
     /*
     Shuffle members.
@@ -324,6 +461,10 @@ async function createRandomRanking(guild) {
         ];
     }
 
+    /*
+    Maximum 10 players.
+    */
+
     const ranking = members
         .slice(0, 10)
         .map(member => ({
@@ -346,7 +487,11 @@ RANKING TEXT
 
 function rankingText(rankings) {
 
-    if (!rankings.length) {
+    if (!Array.isArray(rankings)) {
+        return "No ranking has been created yet.";
+    }
+
+    if (rankings.length === 0) {
         return "No ranking has been created yet.";
     }
 
@@ -359,13 +504,19 @@ function rankingText(rankings) {
 
             if (rank === 1) {
                 medal = "🥇 ";
-            } else if (rank === 2) {
+            }
+
+            if (rank === 2) {
                 medal = "🥈 ";
-            } else if (rank === 3) {
+            }
+
+            if (rank === 3) {
                 medal = "🥉 ";
             }
 
-            return `${medal}**#${rank} — ${player.name}**`;
+            return (
+                `${medal}**#${rank} — ${player.name}**`
+            );
         })
         .join("\n");
 }
@@ -401,26 +552,27 @@ async function updateRankingMessage(guild) {
         getServerData(guild.id);
 
     if (!server.rankingChannelId) {
+
         console.log(
             `No ranking channel configured for ${guild.name}.`
         );
+
         return;
     }
 
     const channel =
-        await guild.channels
-            .fetch(
-                server.rankingChannelId
-            )
-            .catch(error => {
+        await guild.channels.fetch(
+            server.rankingChannelId
+        ).catch(error => {
 
-                console.error(
-                    "Could not fetch ranking channel:",
-                    error
-                );
+            console.error(
+                "Could not fetch ranking channel:"
+            );
 
-                return null;
-            });
+            console.error(error);
+
+            return null;
+        });
 
     if (
         !channel ||
@@ -448,28 +600,43 @@ async function updateRankingMessage(guild) {
     if (server.rankingMessageId) {
 
         message =
-            await channel.messages
-                .fetch(
-                    server.rankingMessageId
-                )
-                .catch(() => null);
+            await channel.messages.fetch(
+                server.rankingMessageId
+            ).catch(() => null);
     }
 
     /*
-    Edit existing message.
+    Existing message found.
+    Edit it.
     */
 
     if (message) {
 
-        await message.edit({
-            embeds: [embed]
-        });
+        try {
 
-        console.log(
-            `Ranking message updated in #${channel.name}.`
-        );
+            await message.edit({
+                embeds: [embed],
+                components: []
+            });
 
-        return;
+            console.log(
+                `Ranking message updated in #${channel.name}.`
+            );
+
+            return;
+
+        } catch (error) {
+
+            console.error(
+                "Could not edit ranking message:"
+            );
+
+            console.error(error);
+
+            server.rankingMessageId = null;
+
+            saveData();
+        }
     }
 
     /*
@@ -478,22 +645,21 @@ async function updateRankingMessage(guild) {
 
     try {
 
-        message =
-            await channel.send({
-                embeds: [embed]
-            });
+        message = await channel.send({
+            embeds: [embed]
+        });
 
         server.rankingMessageId =
             message.id;
 
-        saveData(data);
+        saveData();
 
         console.log(
             `Ranking message created in #${channel.name}.`
         );
 
         /*
-        Pin ranking message.
+        Pin message.
         */
 
         try {
@@ -507,17 +673,23 @@ async function updateRankingMessage(guild) {
         } catch (error) {
 
             console.error(
-                "Could not pin ranking message:",
-                error
+                "Could not pin ranking message:"
+            );
+
+            console.error(error);
+
+            console.error(
+                "Make sure the bot has Manage Messages permission."
             );
         }
 
     } catch (error) {
 
         console.error(
-            "Could not send ranking message:",
-            error
+            "Could not send ranking message:"
         );
+
+        console.error(error);
     }
 }
 
@@ -533,8 +705,35 @@ function hasManagerRole(member, server) {
         return false;
     }
 
+    if (!member || !member.roles) {
+        return false;
+    }
+
     return member.roles.cache.has(
         server.managerRoleId
+    );
+}
+
+/*
+==================================================
+DUPLICATE PLAYER CHECK
+==================================================
+*/
+
+function findRankingPlayer(rankings, name) {
+
+    if (!Array.isArray(rankings)) {
+        return -1;
+    }
+
+    const target =
+        name.trim().toLowerCase();
+
+    return rankings.findIndex(
+        player =>
+            String(player.name)
+                .trim()
+                .toLowerCase() === target
     );
 }
 
@@ -546,6 +745,7 @@ DISCORD READY
 
 client.once("ready", async () => {
 
+    console.log("");
     console.log("========================================");
     console.log(
         `Discord login successful: ${client.user.tag}`
@@ -558,52 +758,79 @@ client.once("ready", async () => {
     );
     console.log("========================================");
 
+    /*
+    Register commands.
+    */
+
     await registerCommands();
+
+    /*
+    Process every server.
+    */
 
     for (
         const guild of client.guilds.cache.values()
     ) {
 
-        console.log(
-            `Processing server: ${guild.name}`
-        );
+        try {
 
-        const server =
-            getServerData(guild.id);
-
-        /*
-        Create initial ranking if needed.
-        */
-
-        if (
-            server.rankings.length === 0
-        ) {
-
-            server.rankings =
-                await createRandomRanking(
-                    guild
-                );
-
-            saveData(data);
-
+            console.log("");
             console.log(
-                `Initial ranking created for ${guild.name}.`
+                `Processing server: ${guild.name}`
             );
-        }
 
-        await updateRankingMessage(
-            guild
-        );
+            const server =
+                getServerData(guild.id);
+
+            /*
+            Create initial ranking
+            if no ranking exists.
+            */
+
+            if (
+                server.rankings.length === 0
+            ) {
+
+                server.rankings =
+                    await createRandomRanking(
+                        guild
+                    );
+
+                saveData();
+
+                console.log(
+                    `Initial ranking created for ${guild.name}.`
+                );
+            }
+
+            /*
+            Update ranking message
+            if a channel was configured.
+            */
+
+            await updateRankingMessage(
+                guild
+            );
+
+        } catch (error) {
+
+            console.error(
+                `Error processing server ${guild.name}:`
+            );
+
+            console.error(error);
+        }
     }
 
+    console.log("");
     console.log("========================================");
-    console.log("RANKING BOT IS READY");
+    console.log("       RANKING BOT IS READY");
     console.log("========================================");
 });
 
 /*
 ==================================================
-DISCORD CLIENT ERRORS
+DISCORD CLIENT EVENTS
 ==================================================
 */
 
@@ -619,10 +846,63 @@ client.on("error", error => {
 client.on("warn", warning => {
 
     console.warn(
-        "Discord warning:",
-        warning
+        "Discord warning:"
     );
+
+    console.warn(warning);
 });
+
+client.on(
+    "shardError",
+    error => {
+
+        console.error(
+            "Discord Gateway shard error:"
+        );
+
+        console.error(error);
+    }
+);
+
+client.on(
+    "shardDisconnect",
+    (event, shardId) => {
+
+        console.warn(
+            `Discord shard ${shardId} disconnected.`
+        );
+
+        console.warn(
+            "Close code:",
+            event?.code
+        );
+
+        console.warn(
+            "Reason:",
+            event?.reason?.toString()
+        );
+    }
+);
+
+client.on(
+    "shardReconnecting",
+    shardId => {
+
+        console.log(
+            `Discord shard ${shardId} reconnecting...`
+        );
+    }
+);
+
+client.on(
+    "shardReady",
+    shardId => {
+
+        console.log(
+            `Discord shard ${shardId} is ready.`
+        );
+    }
+);
 
 /*
 ==================================================
@@ -674,13 +954,14 @@ client.on(
                 ) {
 
                     const role =
-                        interaction.options
-                            .getRole("role");
+                        interaction.options.getRole(
+                            "role"
+                        );
 
                     server.managerRoleId =
                         role.id;
 
-                    saveData(data);
+                    saveData();
 
                     await interaction.reply({
                         content:
@@ -707,21 +988,22 @@ client.on(
                 ) {
 
                     const channel =
-                        interaction.options
-                            .getChannel("channel");
+                        interaction.options.getChannel(
+                            "channel"
+                        );
 
                     server.rankingChannelId =
                         channel.id;
 
                     /*
-                    Force creation of a ranking
-                    message in the new channel.
+                    Force the bot to create/find
+                    the ranking message in this
+                    channel.
                     */
 
-                    server.rankingMessageId =
-                        null;
+                    server.rankingMessageId = null;
 
-                    saveData(data);
+                    saveData();
 
                     await updateRankingMessage(
                         interaction.guild
@@ -764,6 +1046,10 @@ client.on(
                         interaction.options
                             .getString("type");
 
+                    /*
+                    Validate name.
+                    */
+
                     if (!name) {
 
                         await interaction.reply({
@@ -774,6 +1060,26 @@ client.on(
 
                         return;
                     }
+
+                    /*
+                    Maximum Discord embed field
+                    safety.
+                    */
+
+                    if (name.length > 100) {
+
+                        await interaction.reply({
+                            content:
+                                "❌ Player name is too long. Maximum 100 characters.",
+                            ephemeral: true
+                        });
+
+                        return;
+                    }
+
+                    /*
+                    Ranking channel required.
+                    */
 
                     if (
                         !server.rankingChannelId
@@ -789,17 +1095,13 @@ client.on(
                     }
 
                     /*
-                    ==================================
-                    DUPLICATE CHECK
-                    ==================================
+                    Check duplicate.
                     */
 
                     const existingIndex =
-                        server.rankings.findIndex(
-                            player =>
-                                player.name
-                                    .toLowerCase() ===
-                                name.toLowerCase()
+                        findRankingPlayer(
+                            server.rankings,
+                            name
                         );
 
                     if (
@@ -821,8 +1123,7 @@ client.on(
                     */
 
                     const channel =
-                        await interaction.guild
-                            .channels
+                        await interaction.guild.channels
                             .fetch(
                                 server.rankingChannelId
                             )
@@ -881,6 +1182,10 @@ client.on(
                                             : "Replace"
                                 }
                             )
+                            .setFooter({
+                                text:
+                                    "Waiting for manager approval"
+                            })
                             .setTimestamp();
 
                     /*
@@ -892,7 +1197,7 @@ client.on(
                     const acceptButton =
                         new ButtonBuilder()
                             .setCustomId(
-                                `rank_accept:${interaction.id}`
+                                "rank_accept"
                             )
                             .setLabel("Accept")
                             .setEmoji("✅")
@@ -903,7 +1208,7 @@ client.on(
                     const rejectButton =
                         new ButtonBuilder()
                             .setCustomId(
-                                `rank_reject:${interaction.id}`
+                                "rank_reject"
                             )
                             .setLabel("Reject")
                             .setEmoji("❌")
@@ -932,10 +1237,6 @@ client.on(
                     Save request.
                     */
 
-                    if (!server.requests) {
-                        server.requests = {};
-                    }
-
                     server.requests[
                         requestMessage.id
                     ] = {
@@ -943,10 +1244,12 @@ client.on(
                         rank,
                         type,
                         requesterId:
-                            interaction.user.id
+                            interaction.user.id,
+                        createdAt:
+                            Date.now()
                     };
 
-                    saveData(data);
+                    saveData();
 
                     await interaction.reply({
                         content:
@@ -955,7 +1258,7 @@ client.on(
                     });
 
                     console.log(
-                        `Ranking request created by ${interaction.user.tag}: ${name} -> #${rank} (${type})`
+                        `Ranking request created: ${name} -> #${rank} (${type})`
                     );
 
                     return;
@@ -982,7 +1285,7 @@ client.on(
                     );
 
                 /*
-                Manager role check.
+                Only managers can press buttons.
                 */
 
                 if (
@@ -1002,14 +1305,13 @@ client.on(
                 }
 
                 const action =
-                    interaction.customId
-                        .split(":")[0];
+                    interaction.customId;
 
                 const requestMessage =
                     interaction.message;
 
                 const request =
-                    server.requests?.[
+                    server.requests[
                         requestMessage.id
                     ];
 
@@ -1039,14 +1341,23 @@ client.on(
                         requestMessage.id
                     ];
 
-                    saveData(data);
+                    saveData();
 
                     const rejectedEmbed =
-                        EmbedBuilder.from(
-                            requestMessage.embeds[0]
-                        ).setTitle(
+                        requestMessage.embeds.length
+                            ? EmbedBuilder.from(
+                                requestMessage.embeds[0]
+                            )
+                            : new EmbedBuilder();
+
+                    rejectedEmbed
+                        .setTitle(
                             "❌ Ranking Request Rejected"
-                        );
+                        )
+                        .setFooter({
+                            text:
+                                `Rejected by ${interaction.user.tag}`
+                        });
 
                     await interaction.update({
                         embeds: [
@@ -1075,32 +1386,41 @@ client.on(
 
                     /*
                     Check duplicate again.
+                    This protects against two requests
+                    being accepted for the same player.
                     */
 
-                    const duplicate =
-                        server.rankings.some(
-                            player =>
-                                player.name
-                                    .toLowerCase() ===
-                                request.name
-                                    .toLowerCase()
+                    const duplicateIndex =
+                        findRankingPlayer(
+                            server.rankings,
+                            request.name
                         );
 
-                    if (duplicate) {
+                    if (
+                        duplicateIndex !== -1
+                    ) {
 
                         delete server.requests[
                             requestMessage.id
                         ];
 
-                        saveData(data);
+                        saveData();
 
                         const duplicateEmbed =
-                            EmbedBuilder.from(
-                                requestMessage
-                                    .embeds[0]
-                            ).setTitle(
+                            requestMessage.embeds.length
+                                ? EmbedBuilder.from(
+                                    requestMessage.embeds[0]
+                                )
+                                : new EmbedBuilder();
+
+                        duplicateEmbed
+                            .setTitle(
                                 "❌ Automatically Rejected — Player Already Ranked"
-                            );
+                            )
+                            .setFooter({
+                                text:
+                                    `Already ranked at #${duplicateIndex + 1}`
+                            });
 
                         await interaction.update({
                             embeds: [
@@ -1116,14 +1436,32 @@ client.on(
                         request.rank - 1;
 
                     const newPlayer = {
-                        name: request.name,
-                        userId: null
+                        name:
+                            request.name,
+                        userId:
+                            null
                     };
 
                     /*
                     ==================================
                     BETWEEN
                     ==================================
+
+                    Example:
+
+                    Current:
+                    #1 A
+                    #2 B
+                    #3 C
+
+                    Request:
+                    D -> #2 Between
+
+                    Result:
+                    #1 A
+                    #2 D
+                    #3 B
+                    #4 C
                     */
 
                     if (
@@ -1137,6 +1475,10 @@ client.on(
                             newPlayer
                         );
 
+                        /*
+                        Maximum 10.
+                        */
+
                         server.rankings =
                             server.rankings.slice(
                                 0,
@@ -1149,6 +1491,27 @@ client.on(
                         ==================================
                         REPLACE
                         ==================================
+
+                        Example:
+
+                        Current:
+                        #1 A
+                        #2 B
+                        #3 C
+
+                        Request:
+                        D -> #2 Replace
+
+                        Result:
+                        #1 A
+                        #2 D
+                        #3 C
+                        */
+
+                        /*
+                        If the requested position is
+                        beyond the current list, expand
+                        it temporarily.
                         */
 
                         while (
@@ -1157,8 +1520,10 @@ client.on(
                         ) {
 
                             server.rankings.push({
-                                name: "Empty",
-                                userId: null
+                                name:
+                                    "Empty",
+                                userId:
+                                    null
                             });
                         }
 
@@ -1168,8 +1533,7 @@ client.on(
                     }
 
                     /*
-                    Remove empty entries if
-                    any exist.
+                    Remove temporary Empty entries.
                     */
 
                     server.rankings =
@@ -1180,7 +1544,7 @@ client.on(
                         );
 
                     /*
-                    Keep maximum 10.
+                    Maximum 10 players.
                     */
 
                     server.rankings =
@@ -1190,17 +1554,17 @@ client.on(
                         );
 
                     /*
-                    Delete request.
+                    Remove request.
                     */
 
                     delete server.requests[
                         requestMessage.id
                     ];
 
-                    saveData(data);
+                    saveData();
 
                     /*
-                    Update ranking.
+                    Update ranking message.
                     */
 
                     await updateRankingMessage(
@@ -1212,11 +1576,20 @@ client.on(
                     */
 
                     const acceptedEmbed =
-                        EmbedBuilder.from(
-                            requestMessage.embeds[0]
-                        ).setTitle(
+                        requestMessage.embeds.length
+                            ? EmbedBuilder.from(
+                                requestMessage.embeds[0]
+                            )
+                            : new EmbedBuilder();
+
+                    acceptedEmbed
+                        .setTitle(
                             "✅ Ranking Request Accepted"
-                        );
+                        )
+                        .setFooter({
+                            text:
+                                `Accepted by ${interaction.user.tag}`
+                        });
 
                     await interaction.update({
                         embeds: [
@@ -1236,20 +1609,37 @@ client.on(
         } catch (error) {
 
             console.error(
-                "Interaction error:",
-                error
+                "Interaction error:"
             );
 
-            if (
-                !interaction.replied &&
-                !interaction.deferred
-            ) {
+            console.error(error);
 
-                await interaction.reply({
-                    content:
-                        "❌ An unexpected error occurred.",
-                    ephemeral: true
-                }).catch(() => {});
+            try {
+
+                if (
+                    !interaction.replied &&
+                    !interaction.deferred
+                ) {
+
+                    await interaction.reply({
+                        content:
+                            "❌ An unexpected error occurred.",
+                        ephemeral: true
+                    });
+
+                } else {
+
+                    await interaction.followUp({
+                        content:
+                            "❌ An unexpected error occurred.",
+                        ephemeral: true
+                    });
+                }
+
+            } catch (_) {
+                /*
+                Interaction may already have expired.
+                */
             }
         }
     }
@@ -1261,20 +1651,97 @@ DISCORD LOGIN
 ==================================================
 */
 
-console.log(
-    "Attempting to connect to Discord..."
-);
+async function startDiscord() {
 
-client.login(TOKEN)
-    .then(() => {
+    console.log("");
+    console.log(
+        "========================================"
+    );
+
+    console.log(
+        "Checking Discord API connectivity..."
+    );
+
+    const apiOK =
+        await testDiscordAPI();
+
+    if (!apiOK) {
+
+        console.error("");
+        console.error(
+            "Discord API is not reachable from this server."
+        );
+
+        console.error(
+            "The bot will NOT attempt Gateway login."
+        );
+
+        console.error(
+            "Render/network connectivity must be fixed first."
+        );
+
+        return;
+    }
+
+    console.log(
+        "Discord API is reachable."
+    );
+
+    console.log(
+        "Attempting to connect to Discord Gateway..."
+    );
+
+    console.log(
+        "========================================"
+    );
+
+    /*
+    Safety timeout.
+    */
+
+    const loginTimeout =
+        setTimeout(() => {
+
+            console.error("");
+            console.error(
+                "========================================"
+            );
+
+            console.error(
+                "DISCORD LOGIN TIMEOUT"
+            );
+
+            console.error(
+                "Discord Gateway connection did not complete within 30 seconds."
+            );
+
+            console.error(
+                "The process will restart so Render can try again."
+            );
+
+            console.error(
+                "========================================"
+            );
+
+            process.exit(1);
+
+        }, 30000);
+
+    try {
+
+        await client.login(TOKEN);
+
+        clearTimeout(loginTimeout);
 
         console.log(
             "Discord login promise completed."
         );
 
-    })
-    .catch(error => {
+    } catch (error) {
 
+        clearTimeout(loginTimeout);
+
+        console.error("");
         console.error(
             "========================================"
         );
@@ -1289,15 +1756,11 @@ client.login(TOKEN)
             "========================================"
         );
 
-        /*
-        Keep the process alive long enough
-        for Render to display the error.
-        */
-
         setTimeout(() => {
             process.exit(1);
         }, 5000);
-    });
+    }
+}
 
 /*
 ==================================================
@@ -1344,16 +1807,53 @@ process.on(
         );
 
         try {
+
             await client.destroy();
+
         } catch (error) {
+
             console.error(
-                "Error destroying Discord client:",
-                error
+                "Error destroying Discord client:"
             );
+
+            console.error(error);
         }
 
         httpServer.close(() => {
+
             process.exit(0);
         });
     }
 );
+
+process.on(
+    "SIGINT",
+    async () => {
+
+        console.log(
+            "SIGINT received. Shutting down..."
+        );
+
+        try {
+
+            await client.destroy();
+
+        } catch (error) {
+
+            console.error(error);
+        }
+
+        httpServer.close(() => {
+
+            process.exit(0);
+        });
+    }
+);
+
+/*
+==================================================
+START
+==================================================
+*/
+
+startDiscord();
