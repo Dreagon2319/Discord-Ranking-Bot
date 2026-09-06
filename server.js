@@ -20,6 +20,12 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const PORT = Number(process.env.PORT) || 10000;
 const DATA_FILE = "./data.json";
 
+/*
+==================================================
+STARTUP
+==================================================
+*/
+
 console.log("========================================");
 console.log("RANKING BOT STARTING");
 console.log("========================================");
@@ -54,7 +60,9 @@ const httpServer = http.createServer((req, res) => {
 });
 
 httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`HTTP server listening on port ${PORT}`);
+    console.log(
+        `HTTP server listening on port ${PORT}`
+    );
 });
 
 /*
@@ -66,16 +74,25 @@ DATA
 function loadData() {
     try {
         if (!fs.existsSync(DATA_FILE)) {
-            fs.writeFileSync(DATA_FILE, "{}", "utf8");
+            fs.writeFileSync(
+                DATA_FILE,
+                "{}",
+                "utf8"
+            );
         }
 
-        const raw = fs.readFileSync(DATA_FILE, "utf8");
+        const raw =
+            fs.readFileSync(
+                DATA_FILE,
+                "utf8"
+            );
 
         if (!raw.trim()) {
             return {};
         }
 
-        const parsed = JSON.parse(raw);
+        const parsed =
+            JSON.parse(raw);
 
         if (
             typeof parsed !== "object" ||
@@ -86,9 +103,15 @@ function loadData() {
         }
 
         return parsed;
+
     } catch (error) {
-        console.error("Could not load data.json:");
+
+        console.error(
+            "Could not load data.json:"
+        );
+
         console.error(error);
+
         return {};
     }
 }
@@ -97,19 +120,37 @@ const data = loadData();
 
 function saveData() {
     try {
+
         fs.writeFileSync(
             DATA_FILE,
-            JSON.stringify(data, null, 2),
+            JSON.stringify(
+                data,
+                null,
+                2
+            ),
             "utf8"
         );
+
     } catch (error) {
-        console.error("Could not save data.json:");
+
+        console.error(
+            "Could not save data.json:"
+        );
+
         console.error(error);
     }
 }
 
+/*
+==================================================
+SERVER DATA
+==================================================
+*/
+
 function getServerData(guildId) {
+
     if (!data[guildId]) {
+
         data[guildId] = {
             managerRoleId: null,
             rankingChannelId: null,
@@ -121,7 +162,8 @@ function getServerData(guildId) {
         saveData();
     }
 
-    const server = data[guildId];
+    const server =
+        data[guildId];
 
     if (!server.requests) {
         server.requests = {};
@@ -131,24 +173,30 @@ function getServerData(guildId) {
         server.rankings = [];
     }
 
-    if (!Object.prototype.hasOwnProperty.call(
-        server,
-        "managerRoleId"
-    )) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "managerRoleId"
+        )
+    ) {
         server.managerRoleId = null;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(
-        server,
-        "rankingChannelId"
-    )) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "rankingChannelId"
+        )
+    ) {
         server.rankingChannelId = null;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(
-        server,
-        "rankingMessageId"
-    )) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "rankingMessageId"
+        )
+    ) {
         server.rankingMessageId = null;
     }
 
@@ -162,35 +210,67 @@ DEFAULT RANKING
 */
 
 function createDefaultRanking() {
+
     return Array.from(
-        { length: 10 },
-        (_, index) => ({
-            name: `Player${String(index + 1).padStart(3, "0")}`,
-            userId: null
-        })
+        {
+            length: 10
+        },
+        (_, index) => {
+
+            return {
+                name:
+                    `Player${String(
+                        index + 1
+                    ).padStart(3, "0")}`,
+
+                userId: null
+            };
+        }
     );
 }
 
 /*
 ==================================================
-PERMISSION CHECKS
+PERMISSIONS
 ==================================================
 */
 
+/*
+Owner OR Administrator.
+
+These users can:
+
+/setrole
+/setchannel
+
+They can also accept/reject requests.
+*/
+
 function isOwnerOrAdministrator(member) {
+
     if (!member) {
         return false;
     }
 
     return Boolean(
-        member.id === member.guild.ownerId ||
+        member.id ===
+            member.guild.ownerId ||
+
         member.permissions?.has(
             PermissionFlagsBits.Administrator
         )
     );
 }
 
-function hasManagerRole(member, server) {
+/*
+Configured manager role.
+*/
+
+function hasManagerRole(
+    member,
+    server
+) {
+
     if (!server.managerRoleId) {
         return false;
     }
@@ -202,10 +282,25 @@ function hasManagerRole(member, server) {
     );
 }
 
-function canManageRequests(member, server) {
+/*
+Manager = configured role OR
+server owner OR Administrator.
+*/
+
+function canManageRequests(
+    member,
+    server
+) {
+
     return (
-        hasManagerRole(member, server) ||
-        isOwnerOrAdministrator(member)
+        hasManagerRole(
+            member,
+            server
+        ) ||
+
+        isOwnerOrAdministrator(
+            member
+        )
     );
 }
 
@@ -216,10 +311,15 @@ DISCORD CLIENT
 */
 
 const client = new Client({
+
     intents: [
+
         GatewayIntentBits.Guilds,
+
         GatewayIntentBits.GuildMembers
+
     ]
+
 });
 
 /*
@@ -231,87 +331,228 @@ SLASH COMMANDS
 const commands = [
 
     /*
-    /setrole
+    ==============================================
+    /SETROLE
+    ==============================================
     */
 
     new SlashCommandBuilder()
+
         .setName("setrole")
+
         .setDescription(
             "Set the role that can manage ranking requests."
         )
+
         .addRoleOption(option =>
+
             option
+
                 .setName("role")
-                .setDescription("Manager role")
+
+                .setDescription(
+                    "Manager role"
+                )
+
                 .setRequired(true)
+
         )
+
         .setDefaultMemberPermissions(
             PermissionFlagsBits.Administrator
         ),
 
+
     /*
-    /setchannel
+    ==============================================
+    /SETCHANNEL
+    ==============================================
     */
 
     new SlashCommandBuilder()
+
         .setName("setchannel")
+
         .setDescription(
-            "Set the channel where the ranking list is displayed."
+            "Set the channel where the ranking is displayed."
         )
+
         .addChannelOption(option =>
+
             option
+
                 .setName("channel")
-                .setDescription("Ranking channel")
+
+                .setDescription(
+                    "Ranking channel"
+                )
+
                 .addChannelTypes(
                     ChannelType.GuildText
                 )
+
                 .setRequired(true)
+
         )
+
         .setDefaultMemberPermissions(
             PermissionFlagsBits.Administrator
         ),
 
+
     /*
-    /requestrank
+    ==============================================
+    /REQUESTRANK
+    ==============================================
     */
 
     new SlashCommandBuilder()
+
         .setName("requestrank")
+
         .setDescription(
-            "Request a ranking change."
+            "Request a new player ranking."
         )
+
         .addStringOption(option =>
+
             option
+
                 .setName("name")
-                .setDescription("Player name")
+
+                .setDescription(
+                    "Player name"
+                )
+
                 .setRequired(true)
+
         )
+
         .addIntegerOption(option =>
+
             option
+
                 .setName("rank")
-                .setDescription("Requested rank 1-10")
+
+                .setDescription(
+                    "Rank 1-10"
+                )
+
                 .setMinValue(1)
+
                 .setMaxValue(10)
+
                 .setRequired(true)
+
         )
+
         .addStringOption(option =>
+
             option
+
                 .setName("type")
-                .setDescription("Ranking change type")
+
+                .setDescription(
+                    "Ranking change type"
+                )
+
                 .addChoices(
+
                     {
                         name: "Between",
                         value: "between"
                     },
+
                     {
                         name: "Replace",
                         value: "replace"
                     }
+
                 )
+
                 .setRequired(true)
+
+        ),
+
+
+    /*
+    ==============================================
+    /REQUESTMOVE
+    ==============================================
+    */
+
+    new SlashCommandBuilder()
+
+        .setName("requestmove")
+
+        .setDescription(
+            "Request to move an existing player."
         )
 
-].map(command => command.toJSON());
+        .addStringOption(option =>
+
+            option
+
+                .setName("name")
+
+                .setDescription(
+                    "Existing player name"
+                )
+
+                .setRequired(true)
+
+        )
+
+        .addIntegerOption(option =>
+
+            option
+
+                .setName("rank")
+
+                .setDescription(
+                    "Target rank 1-10"
+                )
+
+                .setMinValue(1)
+
+                .setMaxValue(10)
+
+                .setRequired(true)
+
+        )
+
+        .addStringOption(option =>
+
+            option
+
+                .setName("type")
+
+                .setDescription(
+                    "Move type"
+                )
+
+                .addChoices(
+
+                    {
+                        name: "Move",
+                        value: "move"
+                    },
+
+                    {
+                        name: "Replace",
+                        value: "replace"
+                    }
+
+                )
+
+                .setRequired(true)
+
+        )
+
+].map(
+    command =>
+        command.toJSON()
+);
 
 const rest = new REST({
     version: "10"
@@ -324,18 +565,31 @@ REGISTER COMMANDS
 */
 
 async function registerCommands() {
-    console.log("Registering slash commands...");
+
+    console.log(
+        "Registering slash commands..."
+    );
 
     try {
+
         await rest.put(
-            Routes.applicationCommands(CLIENT_ID),
+
+            Routes.applicationCommands(
+                CLIENT_ID
+            ),
+
             {
                 body: commands
             }
+
         );
 
-        console.log("Slash commands registered.");
+        console.log(
+            "Slash commands registered."
+        );
+
     } catch (error) {
+
         console.error(
             "Slash command registration failed:"
         );
@@ -346,32 +600,48 @@ async function registerCommands() {
 
 /*
 ==================================================
-RANKING TEXT
+RANKING DISPLAY
 ==================================================
 */
 
 function rankingText(rankings) {
+
     if (!rankings.length) {
-        return "No ranking has been created yet.";
+
+        return (
+            "No ranking has been created yet."
+        );
     }
 
     return rankings
-        .map((player, index) => {
 
-            const rank = index + 1;
+        .map(
+            (player, index) => {
 
-            let medal = "";
+                const rank =
+                    index + 1;
 
-            if (rank === 1) {
-                medal = "🥇 ";
-            } else if (rank === 2) {
-                medal = "🥈 ";
-            } else if (rank === 3) {
-                medal = "🥉 ";
+                let medal = "";
+
+                if (rank === 1) {
+
+                    medal = "🥇 ";
+
+                } else if (rank === 2) {
+
+                    medal = "🥈 ";
+
+                } else if (rank === 3) {
+
+                    medal = "🥉 ";
+                }
+
+                return (
+                    `${medal}**Rank ${rank} : ${player.name}**`
+                );
             }
+        )
 
-            return `${medal}**#${rank} — ${player.name}**`;
-        })
         .join("\n");
 }
 
@@ -381,15 +651,24 @@ RANKING EMBED
 ==================================================
 */
 
-function createRankingEmbed(rankings) {
+function createRankingEmbed(
+    rankings
+) {
+
     return new EmbedBuilder()
-        .setTitle("🏆 SERVER RANKING")
+
+        .setTitle(
+            "🏆 SERVER RANKING"
+        )
+
         .setDescription(
             rankingText(rankings)
         )
+
         .setFooter({
             text: "Ranking Bot"
         })
+
         .setTimestamp();
 }
 
@@ -399,9 +678,14 @@ UPDATE RANKING MESSAGE
 ==================================================
 */
 
-async function updateRankingMessage(guild) {
+async function updateRankingMessage(
+    guild
+) {
 
-    const server = getServerData(guild.id);
+    const server =
+        getServerData(
+            guild.id
+        );
 
     if (!server.rankingChannelId) {
         return;
@@ -410,12 +694,15 @@ async function updateRankingMessage(guild) {
     const channel =
         await guild.channels.fetch(
             server.rankingChannelId
-        ).catch(() => null);
+        ).catch(
+            () => null
+        );
 
     if (
         !channel ||
         !channel.isTextBased()
     ) {
+
         console.error(
             `Ranking channel unavailable in ${guild.name}.`
         );
@@ -423,26 +710,31 @@ async function updateRankingMessage(guild) {
         return;
     }
 
-    const embed = createRankingEmbed(
-        server.rankings
-    );
+    const embed =
+        createRankingEmbed(
+            server.rankings
+        );
 
     let message = null;
 
     /*
-    Try to find existing ranking message.
+    Try existing ranking message.
     */
 
-    if (server.rankingMessageId) {
+    if (
+        server.rankingMessageId
+    ) {
 
         message =
             await channel.messages.fetch(
                 server.rankingMessageId
-            ).catch(() => null);
+            ).catch(
+                () => null
+            );
     }
 
     /*
-    Edit existing message.
+    Edit existing ranking message.
     */
 
     if (message) {
@@ -450,18 +742,27 @@ async function updateRankingMessage(guild) {
         try {
 
             await message.edit({
-                embeds: [embed]
+
+                embeds: [
+                    embed
+                ]
+
             });
 
             /*
-            Make sure it stays pinned.
+            Make sure ranking
+            message remains pinned.
             */
 
             try {
+
                 if (!message.pinned) {
+
                     await message.pin();
                 }
+
             } catch (error) {
+
                 console.error(
                     "Could not pin ranking message."
                 );
@@ -477,26 +778,36 @@ async function updateRankingMessage(guild) {
 
             console.error(error);
 
-            server.rankingMessageId = null;
+            server.rankingMessageId =
+                null;
 
             saveData();
         }
     }
 
     /*
-    Create new ranking message.
+    Create ranking message.
     */
 
     try {
 
-        message = await channel.send({
-            embeds: [embed]
-        });
+        message =
+            await channel.send({
+
+                embeds: [
+                    embed
+                ]
+
+            });
 
         server.rankingMessageId =
             message.id;
 
         saveData();
+
+        /*
+        Pin ranking message.
+        */
 
         try {
 
@@ -529,7 +840,7 @@ async function updateRankingMessage(guild) {
 
 /*
 ==================================================
-DUPLICATE CHECK
+PLAYER SEARCH
 ==================================================
 */
 
@@ -539,14 +850,168 @@ function findRankingPlayer(
 ) {
 
     const target =
-        name.trim().toLowerCase();
+        String(name)
+            .trim()
+            .toLowerCase();
 
     return rankings.findIndex(
+
         player =>
+
             String(player.name)
                 .trim()
-                .toLowerCase() === target
+                .toLowerCase() ===
+            target
+
     );
+}
+
+/*
+==================================================
+GET RANK
+==================================================
+*/
+
+function getPlayerRank(
+    rankings,
+    name
+) {
+
+    const index =
+        findRankingPlayer(
+            rankings,
+            name
+        );
+
+    if (index === -1) {
+        return null;
+    }
+
+    return index + 1;
+}
+
+/*
+==================================================
+CREATE REQUEST EMBED
+==================================================
+*/
+
+function createRequestEmbed(
+    title,
+    interaction,
+    fields
+) {
+
+    const embed =
+        new EmbedBuilder()
+
+            .setTitle(title)
+
+            .addFields(
+
+                {
+                    name:
+                        "Requested By",
+
+                    value:
+                        `<@${interaction.user.id}>`
+                },
+
+                ...fields
+            )
+
+            .setFooter({
+
+                text:
+                    "Waiting for manager approval"
+            })
+
+            .setTimestamp();
+
+    return embed;
+}
+
+/*
+==================================================
+REQUEST BUTTONS
+==================================================
+*/
+
+function createRequestButtons() {
+
+    const acceptButton =
+        new ButtonBuilder()
+
+            .setCustomId(
+                "ranking_accept"
+            )
+
+            .setLabel(
+                "Accept"
+            )
+
+            .setEmoji(
+                "✅"
+            )
+
+            .setStyle(
+                ButtonStyle.Success
+            );
+
+    const rejectButton =
+        new ButtonBuilder()
+
+            .setCustomId(
+                "ranking_reject"
+            )
+
+            .setLabel(
+                "Reject"
+            )
+
+            .setEmoji(
+                "❌"
+            )
+
+            .setStyle(
+                ButtonStyle.Danger
+            );
+
+    return new ActionRowBuilder()
+        .addComponents(
+            acceptButton,
+            rejectButton
+        );
+}
+
+/*
+==================================================
+PIN REQUEST
+==================================================
+*/
+
+async function pinRequest(
+    message
+) {
+
+    try {
+
+        await message.pin();
+
+        console.log(
+            `Pinned request ${message.id}`
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Could not pin request message."
+        );
+
+        console.error(
+            "Check Manage Messages permission."
+        );
+    }
 }
 
 /*
@@ -555,87 +1020,92 @@ READY
 ==================================================
 */
 
-client.once("ready", async () => {
+client.once(
+    "ready",
+    async () => {
 
-    console.log("");
+        console.log("");
 
-    console.log(
-        "========================================"
-    );
+        console.log(
+            "========================================"
+        );
 
-    console.log(
-        `DISCORD LOGIN SUCCESSFUL: ${client.user.tag}`
-    );
+        console.log(
+            `DISCORD LOGIN SUCCESSFUL: ${client.user.tag}`
+        );
 
-    console.log(
-        `Bot ID: ${client.user.id}`
-    );
+        console.log(
+            `Bot ID: ${client.user.id}`
+        );
 
-    console.log(
-        `Servers: ${client.guilds.cache.size}`
-    );
+        console.log(
+            `Servers: ${client.guilds.cache.size}`
+        );
 
-    console.log(
-        "========================================"
-    );
+        console.log(
+            "========================================"
+        );
 
-    await registerCommands();
+        await registerCommands();
 
-    /*
-    IMPORTANT:
-    Do NOT create random players automatically.
+        /*
+        Do NOT create a ranking automatically.
 
-    Ranking is created only when /setchannel
-    is used for the first time.
-    */
+        The first /setchannel creates:
 
-    for (
-        const guild of client.guilds.cache.values()
-    ) {
+        Player001
+        Player002
+        ...
+        Player010
+        */
 
-        try {
+        for (
+            const guild of
+            client.guilds.cache.values()
+        ) {
 
-            const server =
-                getServerData(guild.id);
+            try {
 
-            /*
-            Only update an existing ranking.
-            */
+                const server =
+                    getServerData(
+                        guild.id
+                    );
 
-            if (
-                server.rankingChannelId &&
-                server.rankings.length
-            ) {
+                if (
+                    server.rankingChannelId &&
+                    server.rankings.length
+                ) {
 
-                await updateRankingMessage(
-                    guild
+                    await updateRankingMessage(
+                        guild
+                    );
+                }
+
+            } catch (error) {
+
+                console.error(
+                    `Error processing ${guild.name}:`
                 );
+
+                console.error(error);
             }
-
-        } catch (error) {
-
-            console.error(
-                `Error processing ${guild.name}:`
-            );
-
-            console.error(error);
         }
+
+        console.log("");
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "RANKING BOT IS READY"
+        );
+
+        console.log(
+            "========================================"
+        );
     }
-
-    console.log("");
-
-    console.log(
-        "========================================"
-    );
-
-    console.log(
-        "RANKING BOT IS READY"
-    );
-
-    console.log(
-        "========================================"
-    );
-});
+);
 
 /*
 ==================================================
@@ -741,16 +1211,15 @@ client.on(
                 interaction.isChatInputCommand()
             ) {
 
-                /*
-                Commands only work inside servers.
-                */
-
                 if (!interaction.guild) {
 
                     await interaction.reply({
+
                         content:
                             "❌ This command can only be used inside a server.",
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -772,11 +1241,6 @@ client.on(
                     "setrole"
                 ) {
 
-                    /*
-                    ONLY SERVER OWNER OR
-                    ADMINISTRATOR
-                    */
-
                     if (
                         !isOwnerOrAdministrator(
                             interaction.member
@@ -784,9 +1248,12 @@ client.on(
                     ) {
 
                         await interaction.reply({
+
                             content:
-                                "❌ Only the server owner or a member with Administrator permission can use this command.",
+                                "❌ Only the server owner or an Administrator can use this command.",
+
                             ephemeral: true
+
                         });
 
                         return;
@@ -803,9 +1270,12 @@ client.on(
                     saveData();
 
                     await interaction.reply({
+
                         content:
                             `✅ Manager role set to **${role.name}**.`,
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -822,11 +1292,6 @@ client.on(
                     "setchannel"
                 ) {
 
-                    /*
-                    ONLY SERVER OWNER OR
-                    ADMINISTRATOR
-                    */
-
                     if (
                         !isOwnerOrAdministrator(
                             interaction.member
@@ -834,9 +1299,12 @@ client.on(
                     ) {
 
                         await interaction.reply({
+
                             content:
-                                "❌ Only the server owner or a member with Administrator permission can use this command.",
+                                "❌ Only the server owner or an Administrator can use this command.",
+
                             ephemeral: true
+
                         });
 
                         return;
@@ -848,7 +1316,7 @@ client.on(
                         );
 
                     /*
-                    Check whether ranking
+                    Check whether a ranking
                     already exists.
                     */
 
@@ -866,14 +1334,11 @@ client.on(
                         channel.id;
 
                     /*
-                    IMPORTANT:
+                    FIRST TIME ONLY:
+                    Create default ranking.
 
-                    If this is the FIRST time
-                    /setchannel is used,
-                    create the default ranking.
-
-                    If ranking already exists,
-                    DO NOT reset it.
+                    Existing ranking is NEVER
+                    reset when channel changes.
                     */
 
                     if (!hadRanking) {
@@ -882,13 +1347,13 @@ client.on(
                             createDefaultRanking();
 
                         console.log(
-                            `Created default ranking for ${interaction.guild.name}.`
+                            `Created default ranking for ${interaction.guild.name}`
                         );
                     }
 
                     /*
-                    New channel means we need
-                    a new ranking message there.
+                    New channel needs a new
+                    ranking message.
                     */
 
                     server.rankingMessageId =
@@ -901,9 +1366,12 @@ client.on(
                     );
 
                     await interaction.reply({
+
                         content:
                             `✅ Ranking channel set to ${channel}.`,
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -922,49 +1390,63 @@ client.on(
 
                     const name =
                         interaction.options
-                            .getString("name")
+                            .getString(
+                                "name"
+                            )
                             .trim();
 
                     const rank =
                         interaction.options
-                            .getInteger("rank");
+                            .getInteger(
+                                "rank"
+                            );
 
                     const type =
                         interaction.options
-                            .getString("type");
+                            .getString(
+                                "type"
+                            );
 
                     /*
-                    Check name.
+                    Empty name.
                     */
 
                     if (!name) {
 
                         await interaction.reply({
+
                             content:
                                 "❌ Player name cannot be empty.",
+
                             ephemeral: true
+
                         });
 
                         return;
                     }
 
                     /*
-                    Maximum name length.
+                    Name length.
                     */
 
-                    if (name.length > 100) {
+                    if (
+                        name.length > 100
+                    ) {
 
                         await interaction.reply({
+
                             content:
                                 "❌ Player name is too long. Maximum 100 characters.",
+
                             ephemeral: true
+
                         });
 
                         return;
                     }
 
                     /*
-                    Check ranking channel.
+                    Ranking must exist.
                     */
 
                     if (
@@ -972,29 +1454,12 @@ client.on(
                     ) {
 
                         await interaction.reply({
+
                             content:
-                                "❌ Ranking channel has not been configured yet.",
+                                "❌ Ranking channel has not been configured. An administrator must use /setchannel first.",
+
                             ephemeral: true
-                        });
 
-                        return;
-                    }
-
-                    /*
-                    Make sure ranking exists.
-                    */
-
-                    if (
-                        !Array.isArray(
-                            server.rankings
-                        ) ||
-                        !server.rankings.length
-                    ) {
-
-                        await interaction.reply({
-                            content:
-                                "❌ Ranking has not been created yet. An administrator must use /setchannel first.",
-                            ephemeral: true
                         });
 
                         return;
@@ -1017,10 +1482,12 @@ client.on(
                     ) {
 
                         await interaction.reply({
+
                             content:
-                                `❌ Request automatically rejected.\n\n` +
-                                `**${name}** is already ranked at **#${existingIndex + 1}**.`,
+                                `❌ Request automatically rejected.\n\n**${name}** is already on the ranking list at **Rank ${existingIndex + 1}**.`,
+
                             ephemeral: true
+
                         });
 
                         return;
@@ -1036,7 +1503,9 @@ client.on(
                             .fetch(
                                 server.rankingChannelId
                             )
-                            .catch(() => null);
+                            .catch(
+                                () => null
+                            );
 
                     if (
                         !channel ||
@@ -1044,113 +1513,75 @@ client.on(
                     ) {
 
                         await interaction.reply({
+
                             content:
                                 "❌ Ranking channel could not be found.",
+
                             ephemeral: true
+
                         });
 
                         return;
                     }
 
                     /*
-                    ==================================
-                    REQUEST EMBED
-                    ==================================
+                    Create request.
                     */
 
                     const embed =
-                        new EmbedBuilder()
-                            .setTitle(
-                                "🏆 Ranking Change Request"
-                            )
-                            .addFields(
-                                {
-                                    name:
-                                        "Requested By",
-                                    value:
-                                        `<@${interaction.user.id}>`
-                                },
+                        createRequestEmbed(
+
+                            "🏆 Ranking Change Request",
+
+                            interaction,
+
+                            [
+
                                 {
                                     name:
                                         "Player",
+
                                     value:
                                         name
                                 },
+
                                 {
                                     name:
-                                        "Rank",
+                                        "Requested Rank",
+
                                     value:
-                                        `#${rank}`
+                                        `Rank ${rank}`
                                 },
+
                                 {
                                     name:
                                         "Type",
+
                                     value:
                                         type ===
                                         "between"
                                             ? "Between"
                                             : "Replace"
                                 }
-                            )
-                            .setFooter({
-                                text:
-                                    "Waiting for manager approval"
-                            })
-                            .setTimestamp();
 
-                    /*
-                    ==================================
-                    BUTTONS
-                    ==================================
-                    */
+                            ]
 
-                    const acceptButton =
-                        new ButtonBuilder()
-                            .setCustomId(
-                                "rank_accept"
-                            )
-                            .setLabel(
-                                "Accept"
-                            )
-                            .setEmoji(
-                                "✅"
-                            )
-                            .setStyle(
-                                ButtonStyle.Success
-                            );
-
-                    const rejectButton =
-                        new ButtonBuilder()
-                            .setCustomId(
-                                "rank_reject"
-                            )
-                            .setLabel(
-                                "Reject"
-                            )
-                            .setEmoji(
-                                "❌"
-                            )
-                            .setStyle(
-                                ButtonStyle.Danger
-                            );
+                        );
 
                     const row =
-                        new ActionRowBuilder()
-                            .addComponents(
-                                acceptButton,
-                                rejectButton
-                            );
-
-                    /*
-                    ==================================
-                    SEND REQUEST
-                    ==================================
-                    */
+                        createRequestButtons();
 
                     const requestMessage =
                         await channel.send({
-                            embeds: [embed],
-                            components: [row]
+
+                            embeds: [
+                                embed
+                            ],
+
+                            components: [
+                                row
+                            ]
+
                         });
 
                     /*
@@ -1160,48 +1591,300 @@ client.on(
                     server.requests[
                         requestMessage.id
                     ] = {
-                        name,
-                        rank,
-                        type,
+
+                        requestType:
+                            "rank",
+
+                        name:
+                            name,
+
+                        rank:
+                            rank,
+
+                        type:
+                            type,
+
                         requesterId:
                             interaction.user.id,
+
                         createdAt:
                             Date.now()
+
                     };
 
                     saveData();
 
                     /*
-                    PIN REQUEST
+                    Pin request.
                     */
 
-                    try {
+                    await pinRequest(
+                        requestMessage
+                    );
 
-                        await requestMessage.pin();
+                    await interaction.reply({
 
-                        console.log(
-                            "Ranking request pinned."
-                        );
+                        content:
+                            "✅ Your ranking request has been submitted for manager approval.",
 
-                    } catch (error) {
+                        ephemeral: true
 
-                        console.error(
-                            "Could not pin ranking request."
-                        );
+                    });
 
-                        console.error(
-                            "Check Manage Messages permission."
-                        );
+                    return;
+                }
+
+                /*
+                ======================================
+                REQUEST MOVE
+                ======================================
+                */
+
+                if (
+                    interaction.commandName ===
+                    "requestmove"
+                ) {
+
+                    const name =
+                        interaction.options
+                            .getString(
+                                "name"
+                            )
+                            .trim();
+
+                    const targetRank =
+                        interaction.options
+                            .getInteger(
+                                "rank"
+                            );
+
+                    const type =
+                        interaction.options
+                            .getString(
+                                "type"
+                            );
+
+                    /*
+                    Ranking must exist.
+                    */
+
+                    if (
+                        !server.rankingChannelId
+                    ) {
+
+                        await interaction.reply({
+
+                            content:
+                                "❌ Ranking channel has not been configured. An administrator must use /setchannel first.",
+
+                            ephemeral: true
+
+                        });
+
+                        return;
                     }
 
                     /*
-                    Confirm to requester.
+                    ==================================
+                    NAME MUST ALREADY EXIST
+                    ==================================
                     */
 
+                    const currentIndex =
+                        findRankingPlayer(
+                            server.rankings,
+                            name
+                        );
+
+                    if (
+                        currentIndex === -1
+                    ) {
+
+                        await interaction.reply({
+
+                            content:
+                                `❌ **${name}** is not currently on the ranking list.`,
+
+                            ephemeral: true
+
+                        });
+
+                        return;
+                    }
+
+                    const currentRank =
+                        currentIndex + 1;
+
+                    /*
+                    Moving to same rank.
+                    */
+
+                    if (
+                        currentRank ===
+                        targetRank
+                    ) {
+
+                        await interaction.reply({
+
+                            content:
+                                `❌ **${name}** is already at Rank ${targetRank}.`,
+
+                            ephemeral: true
+
+                        });
+
+                        return;
+                    }
+
+                    /*
+                    Get channel.
+                    */
+
+                    const channel =
+                        await interaction.guild
+                            .channels
+                            .fetch(
+                                server.rankingChannelId
+                            )
+                            .catch(
+                                () => null
+                            );
+
+                    if (
+                        !channel ||
+                        !channel.isTextBased()
+                    ) {
+
+                        await interaction.reply({
+
+                            content:
+                                "❌ Ranking channel could not be found.",
+
+                            ephemeral: true
+
+                        });
+
+                        return;
+                    }
+
+                    /*
+                    ==================================
+                    CREATE MOVE REQUEST
+                    ==================================
+                    */
+
+                    const embed =
+                        createRequestEmbed(
+
+                            "🔄 Ranking Move Request",
+
+                            interaction,
+
+                            [
+
+                                {
+                                    name:
+                                        "Player",
+
+                                    value:
+                                        name
+                                },
+
+                                {
+                                    name:
+                                        "Current Rank",
+
+                                    value:
+                                        `Rank ${currentRank}`
+                                },
+
+                                {
+                                    name:
+                                        "Requested Rank",
+
+                                    value:
+                                        `Rank ${targetRank}`
+                                },
+
+                                {
+                                    name:
+                                        "Type",
+
+                                    value:
+                                        type ===
+                                        "move"
+                                            ? "Move"
+                                            : "Replace"
+                                }
+
+                            ]
+
+                        );
+
+                    const row =
+                        createRequestButtons();
+
+                    const requestMessage =
+                        await channel.send({
+
+                            embeds: [
+                                embed
+                            ],
+
+                            components: [
+                                row
+                            ]
+
+                        });
+
+                    /*
+                    Save request.
+                    */
+
+                    server.requests[
+                        requestMessage.id
+                    ] = {
+
+                        requestType:
+                            "move",
+
+                        name:
+                            name,
+
+                        currentRank:
+                            currentRank,
+
+                        targetRank:
+                            targetRank,
+
+                        type:
+                            type,
+
+                        requesterId:
+                            interaction.user.id,
+
+                        createdAt:
+                            Date.now()
+
+                    };
+
+                    saveData();
+
+                    /*
+                    Pin request.
+                    */
+
+                    await pinRequest(
+                        requestMessage
+                    );
+
                     await interaction.reply({
+
                         content:
-                            "✅ Your ranking request has been submitted for manager approval.",
+                            "✅ Your move request has been submitted for manager approval.",
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -1228,9 +1911,9 @@ client.on(
                     );
 
                 /*
-                Manager role OR
-                server owner OR
-                Administrator can accept/reject.
+                ======================================
+                MANAGER CHECK
+                ======================================
                 */
 
                 if (
@@ -1241,9 +1924,12 @@ client.on(
                 ) {
 
                     await interaction.reply({
+
                         content:
                             "❌ You do not have permission to manage ranking requests.",
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -1257,16 +1943,15 @@ client.on(
                         requestMessage.id
                     ];
 
-                /*
-                Request no longer exists.
-                */
-
                 if (!request) {
 
                     await interaction.reply({
+
                         content:
                             "❌ This request is no longer available.",
+
                         ephemeral: true
+
                     });
 
                     return;
@@ -1280,7 +1965,7 @@ client.on(
 
                 if (
                     interaction.customId ===
-                    "rank_reject"
+                    "ranking_reject"
                 ) {
 
                     delete server.requests[
@@ -1291,23 +1976,34 @@ client.on(
 
                     const embed =
                         requestMessage.embeds.length
+
                             ? EmbedBuilder.from(
                                 requestMessage.embeds[0]
                             )
+
                             : new EmbedBuilder();
 
                     embed
+
                         .setTitle(
                             "❌ Ranking Request Rejected"
                         )
+
                         .setFooter({
+
                             text:
                                 `Rejected by ${interaction.user.tag}`
+
                         });
 
                     await interaction.update({
-                        embeds: [embed],
+
+                        embeds: [
+                            embed
+                        ],
+
                         components: []
+
                     });
 
                     return;
@@ -1321,26 +2017,147 @@ client.on(
 
                 if (
                     interaction.customId ===
-                    "rank_accept"
+                    "ranking_accept"
                 ) {
 
                     /*
-                    Check duplicate AGAIN.
-
-                    This prevents two requests
-                    for the same player from
-                    both being accepted.
+                    ==================================
+                    RANK REQUEST
+                    ==================================
                     */
 
-                    const duplicateIndex =
-                        findRankingPlayer(
-                            server.rankings,
-                            request.name
-                        );
-
                     if (
-                        duplicateIndex !== -1
+                        request.requestType ===
+                        "rank"
                     ) {
+
+                        /*
+                        Check duplicate AGAIN.
+
+                        Another request may have
+                        been accepted first.
+                        */
+
+                        const duplicateIndex =
+                            findRankingPlayer(
+                                server.rankings,
+                                request.name
+                            );
+
+                        if (
+                            duplicateIndex !==
+                            -1
+                        ) {
+
+                            delete server.requests[
+                                requestMessage.id
+                            ];
+
+                            saveData();
+
+                            const embed =
+                                requestMessage.embeds.length
+
+                                    ? EmbedBuilder.from(
+                                        requestMessage.embeds[0]
+                                    )
+
+                                    : new EmbedBuilder();
+
+                            embed
+
+                                .setTitle(
+                                    "❌ Automatically Rejected — Player Already Ranked"
+                                )
+
+                                .setFooter({
+
+                                    text:
+                                        `Already ranked at Rank ${duplicateIndex + 1}`
+
+                                });
+
+                            await interaction.update({
+
+                                embeds: [
+                                    embed
+                                ],
+
+                                components: []
+
+                            });
+
+                            return;
+                        }
+
+                        const newPlayer = {
+
+                            name:
+                                request.name,
+
+                            userId:
+                                null
+
+                        };
+
+                        const position =
+                            request.rank - 1;
+
+                        /*
+                        ==================================
+                        BETWEEN
+                        ==================================
+                        */
+
+                        if (
+                            request.type ===
+                            "between"
+                        ) {
+
+                            server.rankings.splice(
+
+                                position,
+
+                                0,
+
+                                newPlayer
+
+                            );
+
+                            /*
+                            Remove Rank 10.
+                            */
+
+                            server.rankings =
+                                server.rankings.slice(
+                                    0,
+                                    10
+                                );
+                        }
+
+                        /*
+                        ==================================
+                        REPLACE
+                        ==================================
+                        */
+
+                        else {
+
+                            server.rankings[
+                                position
+                            ] = newPlayer;
+                        }
+
+                        /*
+                        Make absolutely sure
+                        there are maximum 10.
+                        */
+
+                        server.rankings =
+                            server.rankings.slice(
+                                0,
+                                10
+                            );
 
                         delete server.requests[
                             requestMessage.id
@@ -1348,224 +2165,256 @@ client.on(
 
                         saveData();
 
+                        await updateRankingMessage(
+                            interaction.guild
+                        );
+
                         const embed =
                             requestMessage.embeds.length
+
                                 ? EmbedBuilder.from(
                                     requestMessage.embeds[0]
                                 )
+
                                 : new EmbedBuilder();
 
                         embed
+
                             .setTitle(
-                                "❌ Automatically Rejected — Player Already Ranked"
+                                "✅ Ranking Request Accepted"
                             )
+
                             .setFooter({
+
                                 text:
-                                    `Already ranked at #${duplicateIndex + 1}`
+                                    `Accepted by ${interaction.user.tag}`
+
                             });
 
                         await interaction.update({
-                            embeds: [embed],
+
+                            embeds: [
+                                embed
+                            ],
+
                             components: []
+
                         });
 
                         return;
                     }
 
                     /*
-                    Make sure ranking exists.
+                    ==================================
+                    MOVE REQUEST
+                    ==================================
                     */
 
                     if (
-                        !Array.isArray(
-                            server.rankings
-                        )
-                    ) {
-                        server.rankings =
-                            createDefaultRanking();
-                    }
-
-                    /*
-                    Rank position.
-
-                    Rank 1 = index 0
-                    Rank 10 = index 9
-                    */
-
-                    const position =
-                        request.rank - 1;
-
-                    const newPlayer = {
-                        name:
-                            request.name,
-                        userId:
-                            null
-                    };
-
-                    /*
-                    ======================================
-                    BETWEEN
-                    ======================================
-
-                    Example:
-
-                    Old:
-
-                    #1 A
-                    #2 B
-                    #3 C
-                    #4 D
-
-                    Request:
-
-                    X -> Rank 2 -> Between
-
-                    Result:
-
-                    #1 A
-                    #2 X
-                    #3 B
-                    #4 C
-
-                    Everyone below moves down.
-                    Old #10 is removed.
-                    */
-
-                    if (
-                        request.type ===
-                        "between"
+                        request.requestType ===
+                        "move"
                     ) {
 
-                        server.rankings.splice(
-                            position,
-                            0,
-                            newPlayer
-                        );
+                        /*
+                        Find player again.
+
+                        This is important because
+                        the ranking could have changed
+                        while the request was waiting.
+                        */
+
+                        const currentIndex =
+                            findRankingPlayer(
+                                server.rankings,
+                                request.name
+                            );
+
+                        if (
+                            currentIndex ===
+                            -1
+                        ) {
+
+                            delete server.requests[
+                                requestMessage.id
+                            ];
+
+                            saveData();
+
+                            const embed =
+                                requestMessage.embeds.length
+
+                                    ? EmbedBuilder.from(
+                                        requestMessage.embeds[0]
+                                    )
+
+                                    : new EmbedBuilder();
+
+                            embed
+
+                                .setTitle(
+                                    "❌ Automatically Rejected — Player No Longer Ranked"
+                                )
+
+                                .setFooter({
+
+                                    text:
+                                        "The requested player is no longer on the list."
+
+                                });
+
+                            await interaction.update({
+
+                                embeds: [
+                                    embed
+                                ],
+
+                                components: []
+
+                            });
+
+                            return;
+                        }
+
+                        const targetIndex =
+                            request.targetRank - 1;
+
+                        /*
+                        ==================================
+                        MOVE
+                        ==================================
+
+                        Example:
+
+                        A
+                        B
+                        C
+                        D
+
+                        Move D to #2:
+
+                        A
+                        D
+                        B
+                        C
+                        */
+
+                        if (
+                            request.type ===
+                            "move"
+                        ) {
+
+                            const [
+                                movingPlayer
+                            ] =
+                                server.rankings.splice(
+                                    currentIndex,
+                                    1
+                                );
+
+                            server.rankings.splice(
+                                targetIndex,
+                                0,
+                                movingPlayer
+                            );
+                        }
+
+                        /*
+                        ==================================
+                        REPLACE / SWAP
+                        ==================================
+
+                        Example:
+
+                        A
+                        B
+                        C
+                        D
+
+                        Request:
+                        B -> Rank 4
+
+                        Result:
+
+                        A
+                        D
+                        C
+                        B
+                        */
+
+                        else {
+
+                            const temp =
+                                server.rankings[
+                                    currentIndex
+                                ];
+
+                            server.rankings[
+                                currentIndex
+                            ] =
+                                server.rankings[
+                                    targetIndex
+                                ];
+
+                            server.rankings[
+                                targetIndex
+                            ] = temp;
+                        }
+
+                        /*
+                        Keep exactly maximum
+                        10 positions.
+                        */
 
                         server.rankings =
                             server.rankings.slice(
                                 0,
                                 10
                             );
-                    }
 
-                    /*
-                    ======================================
-                    REPLACE
-                    ======================================
+                        delete server.requests[
+                            requestMessage.id
+                        ];
 
-                    Only the selected rank
-                    changes.
-                    */
+                        saveData();
 
-                    else {
-
-                        /*
-                        Normally ranking always has
-                        10 positions.
-
-                        This fallback protects
-                        against malformed data.
-                        */
-
-                        if (
-                            position >=
-                            server.rankings.length
-                        ) {
-
-                            while (
-                                server.rankings.length <
-                                position
-                            ) {
-
-                                server.rankings.push({
-                                    name:
-                                        "Empty",
-                                    userId:
-                                        null
-                                });
-                            }
-
-                            server.rankings.push(
-                                newPlayer
-                            );
-
-                        } else {
-
-                            server.rankings[
-                                position
-                            ] = newPlayer;
-                        }
-                    }
-
-                    /*
-                    ======================================
-                    REMOVE EMPTY PLACEHOLDERS
-                    ======================================
-                    */
-
-                    server.rankings =
-                        server.rankings.filter(
-                            player =>
-                                player.name !==
-                                "Empty"
+                        await updateRankingMessage(
+                            interaction.guild
                         );
 
-                    /*
-                    Keep maximum 10 players.
-                    */
+                        const embed =
+                            requestMessage.embeds.length
 
-                    server.rankings =
-                        server.rankings.slice(
-                            0,
-                            10
-                        );
+                                ? EmbedBuilder.from(
+                                    requestMessage.embeds[0]
+                                )
 
-                    /*
-                    Remove processed request.
-                    */
+                                : new EmbedBuilder();
 
-                    delete server.requests[
-                        requestMessage.id
-                    ];
+                        embed
 
-                    saveData();
-
-                    /*
-                    Update ranking message.
-                    */
-
-                    await updateRankingMessage(
-                        interaction.guild
-                    );
-
-                    /*
-                    Change request message
-                    to accepted.
-                    */
-
-                    const embed =
-                        requestMessage.embeds.length
-                            ? EmbedBuilder.from(
-                                requestMessage.embeds[0]
+                            .setTitle(
+                                "✅ Ranking Move Accepted"
                             )
-                            : new EmbedBuilder();
 
-                    embed
-                        .setTitle(
-                            "✅ Ranking Request Accepted"
-                        )
-                        .setFooter({
-                            text:
-                                `Accepted by ${interaction.user.tag}`
+                            .setFooter({
+
+                                text:
+                                    `Accepted by ${interaction.user.tag}`
+
+                            });
+
+                        await interaction.update({
+
+                            embeds: [
+                                embed
+                            ],
+
+                            components: []
+
                         });
 
-                    await interaction.update({
-                        embeds: [embed],
-                        components: []
-                    });
-
-                    return;
+                        return;
+                    }
                 }
             }
 
@@ -1585,17 +2434,23 @@ client.on(
                 ) {
 
                     await interaction.reply({
+
                         content:
                             "❌ An unexpected error occurred.",
+
                         ephemeral: true
+
                     });
 
                 } else {
 
                     await interaction.followUp({
+
                         content:
                             "❌ An unexpected error occurred.",
+
                         ephemeral: true
+
                     });
                 }
 
@@ -1615,6 +2470,7 @@ console.log(
 );
 
 client.login(TOKEN)
+
     .then(() => {
 
         console.log(
@@ -1622,6 +2478,7 @@ client.login(TOKEN)
         );
 
     })
+
     .catch(error => {
 
         console.error(
@@ -1638,9 +2495,10 @@ client.login(TOKEN)
             "========================================"
         );
 
-        setTimeout(() => {
-            process.exit(1);
-        }, 5000);
+        setTimeout(
+            () => process.exit(1),
+            5000
+        );
     });
 
 /*
@@ -1694,9 +2552,9 @@ async function shutdown() {
         console.error(error);
     }
 
-    httpServer.close(() => {
-        process.exit(0);
-    });
+    httpServer.close(
+        () => process.exit(0)
+    );
 }
 
 process.on(
