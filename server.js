@@ -1044,46 +1044,78 @@ client.on(
                     return;
                 }
 
-                if (
-                    interaction.commandName ===
-                    "showlist"
-                ) {
-                    if (
-                        !server.rankingChannelId
-                    ) {
-                        await interaction.reply({
-                            content:
-                                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
-                            ephemeral: true
-                        });
+if (
+    interaction.commandName ===
+    "showlist"
+) {
+    if (!server.rankingChannelId) {
+        await interaction.reply({
+            content:
+                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
+            ephemeral: true
+        });
 
-                        return;
-                    }
+        return;
+    }
 
-                    if (
-                        !Array.isArray(
-                            server.rankings
-                        ) ||
-                        server.rankings.length === 0
-                    ) {
-                        server.rankings =
-                            createDefaultRanking();
+    if (
+        !Array.isArray(server.rankings) ||
+        server.rankings.length === 0
+    ) {
+        server.rankings =
+            createDefaultRanking();
 
-                        saveData();
-                    }
+        saveData();
+    } else {
+        server.rankings =
+            normalizeRanking(
+                server.rankings
+            );
 
-                    await updateRankingMessage(
-                        guild
-                    );
+        saveData();
+    }
 
-                    await interaction.reply({
-                        content:
-                            "✅ The ranking list has been shown and pinned in the selected channel.",
-                        ephemeral: true
-                    });
+    const channel =
+        await getRankingChannel(
+            guild,
+            server
+        );
 
-                    return;
-                }
+    if (!channel) {
+        await interaction.reply({
+            content:
+                "❌ The selected ranking channel could not be found.",
+            ephemeral: true
+        });
+
+        return;
+    }
+
+    const embed =
+        createRankingEmbed(
+            server.rankings
+        );
+
+    const newMessage =
+        await channel.send({
+            embeds: [embed]
+        });
+
+    await newMessage.pin().catch(() => {});
+
+    server.rankingMessageId =
+        newMessage.id;
+
+    saveData();
+
+    await interaction.reply({
+        content:
+            "✅ The current ranking list has been shown again in the selected channel and pinned.",
+        ephemeral: true
+    });
+
+    return;
+}
 
                 if (
                     interaction.commandName ===
