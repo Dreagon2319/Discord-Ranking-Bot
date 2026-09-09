@@ -1209,110 +1209,107 @@ client.on(
                 */
 
                 if (
-                    interaction.commandName ===
-                    "showlist"
-                ) {
-                    if (
-                        !server.rankingChannelId
-                    ) {
-                        await interaction.reply({
-                            content:
-                                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
-                            ephemeral: true
-                        });
+    interaction.commandName ===
+    "showlist"
+) {
+    if (
+        !server.rankingChannelId
+    ) {
+        await interaction.reply({
+            content:
+                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
+            ephemeral: true
+        });
 
-                        return;
-                    }
+        return;
+    }
 
-                    if (
-                        !Array.isArray(
-                            server.rankings
-                        ) ||
-                        server.rankings.length === 0
-                    ) {
-                        server.rankings =
-                            createDefaultRanking();
+    if (
+        !Array.isArray(
+            server.rankings
+        ) ||
+        server.rankings.length === 0
+    ) {
+        server.rankings =
+            createDefaultRanking();
+    }
 
-                        saveData();
-                    } else {
-                        server.rankings =
-                            normalizeRanking(
-                                server.rankings
-                            );
+    server.rankings =
+        normalizeRanking(
+            server.rankings
+        );
 
-                        saveData();
-                    }
+    saveData();
 
-                    const channel =
-                        await getRankingChannel(
-                            guild,
-                            server
-                        );
+    const channel =
+        await getRankingChannel(
+            guild,
+            server
+        );
 
-                    if (!channel) {
-                        await interaction.reply({
-                            content:
-                                "❌ The selected ranking channel could not be found.",
-                            ephemeral: true
-                        });
+    if (!channel) {
+        await interaction.reply({
+            content:
+                "❌ The selected ranking channel could not be found.",
+            ephemeral: true
+        });
 
-                        return;
-                    }
+        return;
+    }
 
-                    const embed =
-                        createRankingEmbed(
-                            server.rankings
-                        );
+    /*
+        CREATE A COMPLETELY NEW RANKING MESSAGE
+        EVERY TIME /showlist IS USED.
+    */
 
-                    /*
-                        IMPORTANT:
+    const embed =
+        createRankingEmbed(
+            server.rankings
+        );
 
-                        Do NOT use updateRankingMessage()
-                        here.
+    const newMessage =
+        await channel.send({
+            embeds: [embed]
+        });
 
-                        We intentionally send a completely
-                        NEW message every time /showlist
-                        is used.
-                    */
+    /*
+        Pin the new ranking message.
+    */
 
-                    const newMessage =
-                        await channel.send({
-			    content: rankingText(server.rankings),
-                            embeds: [embed]
-                        });
+    await newMessage
+        .pin()
+        .catch(error => {
+            console.error(
+                "Could not pin /showlist message:",
+                error
+            );
+        });
 
-                    /*
-                        Pin the newly created list.
-                    */
+    /*
+        Make this newest message the
+        active ranking message.
+    */
 
-                    await newMessage
-                        .pin()
-                        .catch(error => {
-                            console.error(
-                                "Could not pin /showlist message:",
-                                error
-                            );
-                        });
+    server.rankingMessageId =
+        newMessage.id;
 
-                    /*
-                        Make this newest message the
-                        current ranking message so future
-                        ranking updates edit this one.
-                    */
+    saveData();
 
-                    server.rankingMessageId =
-                        newMessage.id;
+    /*
+        Also show the actual ranking list
+        in the command response instead of
+        showing only a success message.
+    */
 
-                    saveData();
+    await interaction.reply({
+        content:
+            "✅ Ranking list shown again:",
+        embeds: [embed],
+        ephemeral: true
+    });
 
-                    await interaction.reply({
-                        content:
-                            "✅ The current ranking list has been shown again in the selected channel and pinned.",
-                        ephemeral: true
-                    });
-
-                    return;
-                }
+    return;
+}
 
                 /*
                 =========================================
