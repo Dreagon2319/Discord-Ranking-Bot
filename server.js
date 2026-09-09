@@ -73,7 +73,11 @@ function loadData() {
 
         return parsed;
     } catch (error) {
-        console.error("Could not load data.json:", error);
+        console.error(
+            "Could not load data.json:",
+            error
+        );
+
         return {};
     }
 }
@@ -88,7 +92,10 @@ function saveData() {
             "utf8"
         );
     } catch (error) {
-        console.error("Could not save data.json:", error);
+        console.error(
+            "Could not save data.json:",
+            error
+        );
     }
 }
 
@@ -125,15 +132,30 @@ function getServerData(guildId) {
         server.requests = {};
     }
 
-    if (!Object.prototype.hasOwnProperty.call(server, "managerRoleId")) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "managerRoleId"
+        )
+    ) {
         server.managerRoleId = null;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(server, "rankingChannelId")) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "rankingChannelId"
+        )
+    ) {
         server.rankingChannelId = null;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(server, "rankingMessageId")) {
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            server,
+            "rankingMessageId"
+        )
+    ) {
         server.rankingMessageId = null;
     }
 
@@ -212,7 +234,10 @@ function normalizeRanking(rankings) {
     }
 
     return result.map(player => ({
-        name: String(player.name || "").trim(),
+        name: String(
+            player.name || ""
+        ).trim(),
+
         userId: player.userId || null
     }));
 }
@@ -241,14 +266,20 @@ function rankingText(rankings) {
 function createRankingEmbed(rankings) {
     return new EmbedBuilder()
         .setTitle("🏆 SERVER RANKING")
-        .setDescription(rankingText(rankings))
+        .setDescription(
+            rankingText(rankings)
+        )
         .setFooter({
             text: "Ranking Bot"
         })
         .setTimestamp();
 }
 
-function createRequestEmbed(title, interaction, fields) {
+function createRequestEmbed(
+    title,
+    interaction,
+    fields
+) {
     return new EmbedBuilder()
         .setTitle(title)
         .addFields(
@@ -280,78 +311,103 @@ function createRequestButtons() {
     );
 }
 
-async function getRankingChannel(guild, server) {
+async function getRankingChannel(
+    guild,
+    server
+) {
     if (!server.rankingChannelId) {
         return null;
     }
 
-    const channel = await guild.channels
-        .fetch(server.rankingChannelId)
-        .catch(() => null);
+    const channel =
+        await guild.channels
+            .fetch(server.rankingChannelId)
+            .catch(() => null);
 
-    if (!channel || !channel.isTextBased()) {
+    if (
+        !channel ||
+        !channel.isTextBased()
+    ) {
         return null;
     }
 
     return channel;
 }
 
-async function unpinOldRankingMessage(guild, channelId, messageId) {
+async function unpinOldRankingMessage(
+    guild,
+    channelId,
+    messageId
+) {
     if (!channelId || !messageId) {
         return;
     }
 
-    const channel = await guild.channels
-        .fetch(channelId)
-        .catch(() => null);
+    const channel =
+        await guild.channels
+            .fetch(channelId)
+            .catch(() => null);
 
-    if (!channel || !channel.isTextBased()) {
+    if (
+        !channel ||
+        !channel.isTextBased()
+    ) {
         return;
     }
 
-    const message = await channel.messages
-        .fetch(messageId)
-        .catch(() => null);
+    const message =
+        await channel.messages
+            .fetch(messageId)
+            .catch(() => null);
 
     if (!message) {
         return;
     }
 
     if (message.pinned) {
-        await message.unpin().catch(() => {});
+        await message
+            .unpin()
+            .catch(() => {});
     }
 }
 
 async function updateRankingMessage(guild) {
-    const server = getServerData(guild.id);
+    const server =
+        getServerData(guild.id);
 
     if (!server.rankingChannelId) {
         return null;
     }
 
-    server.rankings = normalizeRanking(
-        server.rankings
-    );
+    server.rankings =
+        normalizeRanking(
+            server.rankings
+        );
 
-    const channel = await getRankingChannel(
-        guild,
-        server
-    );
+    const channel =
+        await getRankingChannel(
+            guild,
+            server
+        );
 
     if (!channel) {
         return null;
     }
 
-    const embed = createRankingEmbed(
-        server.rankings
-    );
+    const embed =
+        createRankingEmbed(
+            server.rankings
+        );
 
     let message = null;
 
     if (server.rankingMessageId) {
-        message = await channel.messages
-            .fetch(server.rankingMessageId)
-            .catch(() => null);
+        message =
+            await channel.messages
+                .fetch(
+                    server.rankingMessageId
+                )
+                .catch(() => null);
     }
 
     if (message) {
@@ -361,7 +417,9 @@ async function updateRankingMessage(guild) {
         });
 
         if (!message.pinned) {
-            await message.pin().catch(() => {});
+            await message
+                .pin()
+                .catch(() => {});
         }
 
         saveData();
@@ -369,25 +427,34 @@ async function updateRankingMessage(guild) {
         return message;
     }
 
-    message = await channel.send({
-        embeds: [embed]
-    });
+    message =
+        await channel.send({
+            embeds: [embed]
+        });
 
-    server.rankingMessageId = message.id;
+    server.rankingMessageId =
+        message.id;
 
     saveData();
 
-    await message.pin().catch(error => {
-        console.error(
-            "Could not pin ranking message:",
-            error
-        );
-    });
+    await message
+        .pin()
+        .catch(error => {
+            console.error(
+                "Could not pin ranking message:",
+                error
+            );
+        });
 
     return message;
 }
 
-function applyRankChange(rankings, name, rank, type) {
+function applyRankChange(
+    rankings,
+    name,
+    rank,
+    type
+) {
     const newPlayer = {
         name: name.trim(),
         userId: null
@@ -402,29 +469,40 @@ function applyRankChange(rankings, name, rank, type) {
 
         rankings.splice(10);
     } else if (type === "replace") {
-        rankings[rank - 1] = newPlayer;
+        rankings[rank - 1] =
+            newPlayer;
     }
 
-    return normalizeRanking(rankings);
+    return normalizeRanking(
+        rankings
+    );
 }
 
-function applyMoveChange(rankings, name, rank, type) {
-    const currentIndex = findRankingPlayer(
-        rankings,
-        name
-    );
+function applyMoveChange(
+    rankings,
+    name,
+    rank,
+    type
+) {
+    const currentIndex =
+        findRankingPlayer(
+            rankings,
+            name
+        );
 
     if (currentIndex === -1) {
         return null;
     }
 
-    const targetIndex = rank - 1;
+    const targetIndex =
+        rank - 1;
 
     if (type === "move") {
-        const player = rankings.splice(
-            currentIndex,
-            1
-        )[0];
+        const player =
+            rankings.splice(
+                currentIndex,
+                1
+            )[0];
 
         rankings.splice(
             targetIndex,
@@ -432,9 +510,8 @@ function applyMoveChange(rankings, name, rank, type) {
             player
         );
     } else if (type === "replace") {
-        const temporary = rankings[
-            currentIndex
-        ];
+        const temporary =
+            rankings[currentIndex];
 
         rankings[currentIndex] =
             rankings[targetIndex];
@@ -443,29 +520,57 @@ function applyMoveChange(rankings, name, rank, type) {
             temporary;
     }
 
-    return normalizeRanking(rankings);
+    return normalizeRanking(
+        rankings
+    );
 }
 
+/*
+    RECOVER DATA
+
+    IMPORTANT:
+    This function NO LONGER checks who authored
+    the message.
+
+    Therefore /recoverdata can recover from:
+    - Ranking Bot messages
+    - Admin messages
+    - Moderator messages
+    - Messages from other bots
+    - Any other user's message
+
+    The message still has to contain a valid
+    10-rank Ranking Bot style embed.
+*/
 function parseRankingMessage(message) {
     if (!message) {
         return null;
     }
 
-    if (
-        !client.user ||
-        message.author?.id !== client.user.id
-    ) {
-        return null;
-    }
+    /*
+        REMOVED:
+
+        if (
+            !client.user ||
+            message.author?.id !== client.user.id
+        ) {
+            return null;
+        }
+
+        This was the restriction that allowed
+        recovery only from Ranking Bot messages.
+    */
 
     if (!message.embeds?.length) {
         return null;
     }
 
-    const embed = message.embeds[0];
+    const embed =
+        message.embeds[0];
 
     if (
-        embed.title !== "🏆 SERVER RANKING"
+        embed.title !==
+        "🏆 SERVER RANKING"
     ) {
         return null;
     }
@@ -474,29 +579,44 @@ function parseRankingMessage(message) {
         return null;
     }
 
-    const lines = embed.description
-        .split("\n")
-        .map(line => line.trim())
-        .filter(Boolean);
+    const lines =
+        embed.description
+            .split("\n")
+            .map(line => line.trim())
+            .filter(Boolean);
 
     const rankings = [];
 
     for (const line of lines) {
-        const cleaned = line
-            .replace(/^🥇\s*/, "")
-            .replace(/^🥈\s*/, "")
-            .replace(/^🥉\s*/, "");
+        const cleaned =
+            line
+                .replace(
+                    /^🥇\s*/,
+                    ""
+                )
+                .replace(
+                    /^🥈\s*/,
+                    ""
+                )
+                .replace(
+                    /^🥉\s*/,
+                    ""
+                );
 
-        const match = cleaned.match(
-            /^\*\*Rank\s+(\d+)\s*:\s*(.*?)\*\*$/
-        );
+        const match =
+            cleaned.match(
+                /^\*\*Rank\s+(\d+)\s*:\s*(.*?)\*\*$/
+            );
 
         if (!match) {
             return null;
         }
 
-        const rank = Number(match[1]);
-        const name = match[2].trim();
+        const rank =
+            Number(match[1]);
+
+        const name =
+            match[2].trim();
 
         if (
             !Number.isInteger(rank) ||
@@ -517,20 +637,27 @@ function parseRankingMessage(message) {
         return null;
     }
 
-    for (let index = 0; index < 10; index++) {
+    for (
+        let index = 0;
+        index < 10;
+        index++
+    ) {
         if (!rankings[index]) {
             return null;
         }
     }
 
-    const names = rankings.map(
-        player =>
-            player.name
-                .trim()
-                .toLowerCase()
-    );
+    const names =
+        rankings.map(
+            player =>
+                player.name
+                    .trim()
+                    .toLowerCase()
+        );
 
-    if (new Set(names).size !== 10) {
+    if (
+        new Set(names).size !== 10
+    ) {
         return null;
     }
 
@@ -753,13 +880,13 @@ const commands = [
     new SlashCommandBuilder()
         .setName("recoverdata")
         .setDescription(
-            "Recover the ranking from an old Ranking Bot message."
+            "Recover the ranking from an old ranking-list message."
         )
         .addStringOption(option =>
             option
                 .setName("data")
                 .setDescription(
-                    "Just copy old list as message link and paste in data."
+                    "Copy the old ranking-list message link and paste it here."
                 )
                 .setRequired(true)
         ),
@@ -767,16 +894,20 @@ const commands = [
     new SlashCommandBuilder()
         .setName("showlist")
         .setDescription(
-            "Show the existing ranking list in the selected channel."
+            "Show the existing ranking list again in the selected channel."
         )
-].map(command => command.toJSON());
+].map(command =>
+    command.toJSON()
+);
 
 const rest = new REST({
     version: "10"
 }).setToken(TOKEN);
 
 async function registerCommands() {
-    console.log("Registering slash commands...");
+    console.log(
+        "Registering slash commands..."
+    );
 
     try {
         await rest.put(
@@ -799,62 +930,74 @@ async function registerCommands() {
     }
 }
 
-client.once("ready", async () => {
-    console.log(
-        `DISCORD LOGIN SUCCESSFUL: ${client.user.tag}`
-    );
+client.once(
+    "ready",
+    async () => {
+        console.log(
+            `DISCORD LOGIN SUCCESSFUL: ${client.user.tag}`
+        );
 
-    console.log(
-        `Bot ID: ${client.user.id}`
-    );
+        console.log(
+            `Bot ID: ${client.user.id}`
+        );
 
-    console.log(
-        `Servers: ${client.guilds.cache.size}`
-    );
+        console.log(
+            `Servers: ${client.guilds.cache.size}`
+        );
 
-    await registerCommands();
+        await registerCommands();
 
-    for (
-        const guild of client.guilds.cache.values()
-    ) {
-        try {
-            const server =
-                getServerData(guild.id);
+        for (
+            const guild of
+            client.guilds.cache.values()
+        ) {
+            try {
+                const server =
+                    getServerData(
+                        guild.id
+                    );
 
-            if (
-                server.rankingChannelId &&
-                server.rankings.length
-            ) {
-                await updateRankingMessage(
-                    guild
+                if (
+                    server.rankingChannelId &&
+                    server.rankings.length
+                ) {
+                    await updateRankingMessage(
+                        guild
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    `Error updating ${guild.name}:`,
+                    error
                 );
             }
-        } catch (error) {
-            console.error(
-                `Error updating ${guild.name}:`,
-                error
-            );
         }
+
+        console.log(
+            "RANKING BOT IS READY"
+        );
     }
+);
 
-    console.log(
-        "RANKING BOT IS READY"
-    );
-});
+client.on(
+    "error",
+    error => {
+        console.error(
+            "Discord client error:",
+            error
+        );
+    }
+);
 
-client.on("error", error => {
-    console.error(
-        "Discord client error:",
-        error
-    );
-});
-
-client.on("warn", warning => {
-    console.warn(
-        "Discord warning:",
-        warning
-    );
-});
+client.on(
+    "warn",
+    warning => {
+        console.warn(
+            "Discord warning:",
+            warning
+        );
+    }
+);
 
 client.on(
     "shardError",
@@ -929,6 +1072,12 @@ client.on(
                         guild.id
                     );
 
+                /*
+                =========================================
+                /setrole
+                =========================================
+                */
+
                 if (
                     interaction.commandName ===
                     "setrole"
@@ -965,6 +1114,12 @@ client.on(
 
                     return;
                 }
+
+                /*
+                =========================================
+                /setchannel
+                =========================================
+                */
 
                 if (
                     interaction.commandName ===
@@ -1004,7 +1159,8 @@ client.on(
                     if (
                         oldChannelId &&
                         oldMessageId &&
-                        oldChannelId !== channel.id
+                        oldChannelId !==
+                            channel.id
                     ) {
                         await unpinOldRankingMessage(
                             guild,
@@ -1044,78 +1200,124 @@ client.on(
                     return;
                 }
 
-if (
-    interaction.commandName ===
-    "showlist"
-) {
-    if (!server.rankingChannelId) {
-        await interaction.reply({
-            content:
-                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
-            ephemeral: true
-        });
+                /*
+                =========================================
+                /showlist
 
-        return;
-    }
+                ALWAYS CREATES A NEW MESSAGE.
+                =========================================
+                */
 
-    if (
-        !Array.isArray(server.rankings) ||
-        server.rankings.length === 0
-    ) {
-        server.rankings =
-            createDefaultRanking();
+                if (
+                    interaction.commandName ===
+                    "showlist"
+                ) {
+                    if (
+                        !server.rankingChannelId
+                    ) {
+                        await interaction.reply({
+                            content:
+                                "❌ No ranking channel has been set. An owner or Administrator must use /setchannel first.",
+                            ephemeral: true
+                        });
 
-        saveData();
-    } else {
-        server.rankings =
-            normalizeRanking(
-                server.rankings
-            );
+                        return;
+                    }
 
-        saveData();
-    }
+                    if (
+                        !Array.isArray(
+                            server.rankings
+                        ) ||
+                        server.rankings.length === 0
+                    ) {
+                        server.rankings =
+                            createDefaultRanking();
 
-    const channel =
-        await getRankingChannel(
-            guild,
-            server
-        );
+                        saveData();
+                    } else {
+                        server.rankings =
+                            normalizeRanking(
+                                server.rankings
+                            );
 
-    if (!channel) {
-        await interaction.reply({
-            content:
-                "❌ The selected ranking channel could not be found.",
-            ephemeral: true
-        });
+                        saveData();
+                    }
 
-        return;
-    }
+                    const channel =
+                        await getRankingChannel(
+                            guild,
+                            server
+                        );
 
-    const embed =
-        createRankingEmbed(
-            server.rankings
-        );
+                    if (!channel) {
+                        await interaction.reply({
+                            content:
+                                "❌ The selected ranking channel could not be found.",
+                            ephemeral: true
+                        });
 
-    const newMessage =
-        await channel.send({
-            embeds: [embed]
-        });
+                        return;
+                    }
 
-    await newMessage.pin().catch(() => {});
+                    const embed =
+                        createRankingEmbed(
+                            server.rankings
+                        );
 
-    server.rankingMessageId =
-        newMessage.id;
+                    /*
+                        IMPORTANT:
 
-    saveData();
+                        Do NOT use updateRankingMessage()
+                        here.
 
-    await interaction.reply({
-        content:
-            "✅ The current ranking list has been shown again in the selected channel and pinned.",
-        ephemeral: true
-    });
+                        We intentionally send a completely
+                        NEW message every time /showlist
+                        is used.
+                    */
 
-    return;
-}
+                    const newMessage =
+                        await channel.send({
+                            embeds: [embed]
+                        });
+
+                    /*
+                        Pin the newly created list.
+                    */
+
+                    await newMessage
+                        .pin()
+                        .catch(error => {
+                            console.error(
+                                "Could not pin /showlist message:",
+                                error
+                            );
+                        });
+
+                    /*
+                        Make this newest message the
+                        current ranking message so future
+                        ranking updates edit this one.
+                    */
+
+                    server.rankingMessageId =
+                        newMessage.id;
+
+                    saveData();
+
+                    await interaction.reply({
+                        content:
+                            "✅ The current ranking list has been shown again in the selected channel and pinned.",
+                        ephemeral: true
+                    });
+
+                    return;
+                }
+
+                /*
+                =========================================
+                /requestrank
+                =========================================
+                */
 
                 if (
                     interaction.commandName ===
@@ -1123,18 +1325,26 @@ if (
                 ) {
                     const name =
                         interaction.options
-                            .getString("name")
+                            .getString(
+                                "name"
+                            )
                             .trim();
 
                     const rank =
                         interaction.options
-                            .getInteger("rank");
+                            .getInteger(
+                                "rank"
+                            );
 
                     const type =
                         interaction.options
-                            .getString("type");
+                            .getString(
+                                "type"
+                            );
 
-                    if (!server.rankingChannelId) {
+                    if (
+                        !server.rankingChannelId
+                    ) {
                         await interaction.reply({
                             content:
                                 "❌ A ranking channel has not been set.",
@@ -1206,7 +1416,8 @@ if (
                                 },
                                 {
                                     name: "Requested Rank",
-                                    value: `#${rank}`
+                                    value:
+                                        `#${rank}`
                                 },
                                 {
                                     name: "Type",
@@ -1253,24 +1464,38 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                /requestmove
+                =========================================
+                */
+
                 if (
                     interaction.commandName ===
                     "requestmove"
                 ) {
                     const name =
                         interaction.options
-                            .getString("name")
+                            .getString(
+                                "name"
+                            )
                             .trim();
 
                     const rank =
                         interaction.options
-                            .getInteger("rank");
+                            .getInteger(
+                                "rank"
+                            );
 
                     const type =
                         interaction.options
-                            .getString("type");
+                            .getString(
+                                "type"
+                            );
 
-                    if (!server.rankingChannelId) {
+                    if (
+                        !server.rankingChannelId
+                    ) {
                         await interaction.reply({
                             content:
                                 "❌ A ranking channel has not been set.",
@@ -1286,7 +1511,9 @@ if (
                             name
                         );
 
-                    if (currentIndex === -1) {
+                    if (
+                        currentIndex === -1
+                    ) {
                         await interaction.reply({
                             content:
                                 `❌ **${name}** is not currently on the ranking list.`,
@@ -1389,6 +1616,12 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                /setrank
+                =========================================
+                */
+
                 if (
                     interaction.commandName ===
                     "setrank"
@@ -1410,16 +1643,22 @@ if (
 
                     const name =
                         interaction.options
-                            .getString("name")
+                            .getString(
+                                "name"
+                            )
                             .trim();
 
                     const rank =
                         interaction.options
-                            .getInteger("rank");
+                            .getInteger(
+                                "rank"
+                            );
 
                     const type =
                         interaction.options
-                            .getString("type");
+                            .getString(
+                                "type"
+                            );
 
                     if (
                         rankingNameExists(
@@ -1459,6 +1698,12 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                /setmove
+                =========================================
+                */
+
                 if (
                     interaction.commandName ===
                     "setmove"
@@ -1480,16 +1725,22 @@ if (
 
                     const name =
                         interaction.options
-                            .getString("name")
+                            .getString(
+                                "name"
+                            )
                             .trim();
 
                     const rank =
                         interaction.options
-                            .getInteger("rank");
+                            .getInteger(
+                                "rank"
+                            );
 
                     const type =
                         interaction.options
-                            .getString("type");
+                            .getString(
+                                "type"
+                            );
 
                     const currentIndex =
                         findRankingPlayer(
@@ -1558,6 +1809,12 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                /recoverdata
+                =========================================
+                */
+
                 if (
                     interaction.commandName ===
                     "recoverdata"
@@ -1579,7 +1836,9 @@ if (
 
                     const link =
                         interaction.options
-                            .getString("data")
+                            .getString(
+                                "data"
+                            )
                             .trim();
 
                     const match =
@@ -1624,7 +1883,9 @@ if (
                             .fetch(
                                 linkedChannelId
                             )
-                            .catch(() => null);
+                            .catch(
+                                () => null
+                            );
 
                     if (
                         !linkedChannel ||
@@ -1644,7 +1905,9 @@ if (
                             .fetch(
                                 linkedMessageId
                             )
-                            .catch(() => null);
+                            .catch(
+                                () => null
+                            );
 
                     if (!linkedMessage) {
                         await interaction.reply({
@@ -1656,6 +1919,14 @@ if (
                         return;
                     }
 
+                    /*
+                        The important change is inside
+                        parseRankingMessage().
+
+                        The author of this message does
+                        NOT need to be Ranking Bot.
+                    */
+
                     const recovered =
                         parseRankingMessage(
                             linkedMessage
@@ -1664,7 +1935,7 @@ if (
                     if (!recovered) {
                         await interaction.reply({
                             content:
-                                "❌ Recovery failed. The linked message is not a valid Ranking Bot ranking-list message.",
+                                "❌ Recovery failed. The linked message does not contain a valid 10-player ranking list.",
                             ephemeral: true
                         });
 
@@ -1695,13 +1966,19 @@ if (
 
                     await interaction.reply({
                         content:
-                            "✅ Ranking data successfully recovered from the old Ranking Bot list.",
+                            "✅ Ranking data successfully recovered from the linked ranking-list message.",
                         ephemeral: true
                     });
 
                     return;
                 }
             }
+
+            /*
+            =========================================
+            BUTTON INTERACTIONS
+            =========================================
+            */
 
             if (
                 interaction.isButton()
@@ -1757,6 +2034,12 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                REJECT
+                =========================================
+                */
+
                 if (
                     interaction.customId ===
                     "ranking_reject"
@@ -1771,7 +2054,8 @@ if (
                         interaction.message
                             .embeds?.[0]
                             ? EmbedBuilder.from(
-                                interaction.message.embeds[0]
+                                interaction.message
+                                    .embeds[0]
                             )
                             : new EmbedBuilder()
                                 .setTitle(
@@ -1798,10 +2082,22 @@ if (
                     return;
                 }
 
+                /*
+                =========================================
+                ACCEPT
+                =========================================
+                */
+
                 if (
                     interaction.customId ===
                     "ranking_accept"
                 ) {
+                    /*
+                    =====================================
+                    ACCEPT RANK REQUEST
+                    =====================================
+                    */
+
                     if (
                         request.requestType ===
                         "rank"
@@ -1822,7 +2118,8 @@ if (
                                 interaction.message
                                     .embeds?.[0]
                                     ? EmbedBuilder.from(
-                                        interaction.message.embeds[0]
+                                        interaction.message
+                                            .embeds[0]
                                     )
                                     : new EmbedBuilder()
                                         .setTitle(
@@ -1855,6 +2152,12 @@ if (
                             );
                     }
 
+                    /*
+                    =====================================
+                    ACCEPT MOVE REQUEST
+                    =====================================
+                    */
+
                     if (
                         request.requestType ===
                         "move"
@@ -1878,7 +2181,8 @@ if (
                                 interaction.message
                                     .embeds?.[0]
                                     ? EmbedBuilder.from(
-                                        interaction.message.embeds[0]
+                                        interaction.message
+                                            .embeds[0]
                                     )
                                     : new EmbedBuilder()
                                         .setTitle(
@@ -1916,7 +2220,8 @@ if (
                                 interaction.message
                                     .embeds?.[0]
                                     ? EmbedBuilder.from(
-                                        interaction.message.embeds[0]
+                                        interaction.message
+                                            .embeds[0]
                                     )
                                     : new EmbedBuilder()
                                         .setTitle(
@@ -1981,7 +2286,8 @@ if (
                         interaction.message
                             .embeds?.[0]
                             ? EmbedBuilder.from(
-                                interaction.message.embeds[0]
+                                interaction.message
+                                    .embeds[0]
                             )
                             : new EmbedBuilder()
                                 .setTitle(
