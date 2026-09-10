@@ -1315,7 +1315,10 @@ client.on(
 
     return;
 }
-
+if (
+    interaction.commandName ===
+    "NewCommand"
+) { return; }
                 /*
                 =========================================
                 /requestrank
