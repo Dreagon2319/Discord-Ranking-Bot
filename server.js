@@ -896,6 +896,11 @@ const commands = [
         .setDescription(
             "Show the existing ranking list again in the selected channel."
         )
+    new SlashCommandBuilder()
+        .setName("NewCommand")
+        .setDescription(
+            "Show Nothing"
+        )
 ].map(command =>
     command.toJSON()
 );
