@@ -549,17 +549,27 @@ function parseRankingMessage(message) {
 
     let text = "";
 
-    // Read normal Discord message text
-    if (message.content) {
+    /*
+    =========================================
+    READ NORMAL MESSAGE CONTENT
+    =========================================
+    */
+
+    if (typeof message.content === "string") {
         text += message.content + "\n";
     }
 
-    // Also read embeds
+    /*
+    =========================================
+    READ EMBED CONTENT
+    =========================================
+    */
+
     if (
-        message.embeds &&
-        message.embeds.length > 0
+        Array.isArray(message.embeds)
     ) {
         for (const embed of message.embeds) {
+
             if (embed.title) {
                 text += embed.title + "\n";
             }
@@ -569,10 +579,10 @@ function parseRankingMessage(message) {
             }
 
             if (
-                embed.fields &&
-                embed.fields.length > 0
+                Array.isArray(embed.fields)
             ) {
                 for (const field of embed.fields) {
+
                     if (field.name) {
                         text += field.name + "\n";
                     }
@@ -582,6 +592,10 @@ function parseRankingMessage(message) {
                     }
                 }
             }
+
+            if (embed.footer?.text) {
+                text += embed.footer.text + "\n";
+            }
         }
     }
 
@@ -589,50 +603,92 @@ function parseRankingMessage(message) {
         return null;
     }
 
-    // Remove Discord markdown formatting
+    /*
+    =========================================
+    CLEAN DISCORD FORMATTING
+    =========================================
+    */
+
     text = text
         .replace(/\r/g, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/```/g, "")
+        .replace(/`/g, "")
         .replace(/\*\*/g, "")
-        .replace(/__/g, "")
-        .replace(/`/g, "");
+        .replace(/__/g, "");
 
     const rankings = [];
+
+    /*
+    =========================================
+    READ EVERY LINE
+    =========================================
+    */
+
     const lines = text.split("\n");
 
     for (const rawLine of lines) {
+
         let line = rawLine.trim();
 
         if (!line) {
             continue;
         }
 
-        // Remove Discord emoji links such as [🥇](https://...)
-        line = line.replace(
-            /\[([^\]]+)\]\([^)]+\)/g,
-            "$1"
-        );
+        /*
+        Remove ranking medals.
 
-        // Remove ranking emojis
+        Example:
+        🥇 Rank 1 : chris
+        🥈 Rank 2 : Melissa
+        🥉 Rank 3 : Solar
+        */
+
         line = line.replace(
             /^[🥇🥈🥉🏅🏆]\s*/,
             ""
         );
 
-        let match = null;
+        /*
+        =========================================
+        FORMAT:
 
-        // Format:
-        // Rank 1 : chris
-        match = line.match(
-            /^Rank\s*(\d{1,2})\s*[:\-–—]\s*(.+)$/i
+        Rank 1 : chris
+        Rank 2 : Melissa
+        Rank 3 : Solar
+        =========================================
+        */
+
+        let match = line.match(
+            /^Rank\s*(\d{1,2})\s*:\s*(.+)$/i
         );
 
-        // Format:
-        // #1 — chris
-        // #1 - chris
-        // #1 – chris
+        /*
+        Also accept:
+
+        Rank 1 - chris
+        Rank 1 – chris
+        Rank 1 — chris
+        */
+
         if (!match) {
             match = line.match(
-                /^#\s*(\d{1,2})\s*[-–—:]\s*(.+)$/
+                /^Rank\s*(\d{1,2})\s*[-–—]\s*(.+)$/i
+            );
+        }
+
+        /*
+        Also accept:
+
+        #1 : chris
+        #1 - chris
+        #1 – chris
+        #1 — chris
+        */
+
+        if (!match) {
+            match = line.match(
+                /^#\s*(\d{1,2})\s*[:\-–—]\s*(.+)$/
             );
         }
 
@@ -641,7 +697,15 @@ function parseRankingMessage(message) {
         }
 
         const rank = Number(match[1]);
-        let name = match[2].trim();
+
+        /*
+        EVERYTHING AFTER THE SEPARATOR
+        IS THE PLAYER NAME.
+
+        No predefined names.
+        */
+
+        const name = match[2].trim();
 
         if (
             rank < 1 ||
@@ -651,7 +715,10 @@ function parseRankingMessage(message) {
             continue;
         }
 
-        // Prevent duplicate ranks
+        /*
+        Do not allow the same rank twice.
+        */
+
         if (
             rankings.some(
                 player =>
@@ -668,17 +735,31 @@ function parseRankingMessage(message) {
         });
     }
 
-    // Must have exactly 10 players
+    /*
+    =========================================
+    MUST HAVE EXACTLY 10 RANKS
+    =========================================
+    */
+
     if (rankings.length !== 10) {
         return null;
     }
+
+    /*
+    Sort by rank.
+    */
 
     rankings.sort(
         (a, b) =>
             a.rank - b.rank
     );
 
-    // Must contain ranks 1 through 10
+    /*
+    =========================================
+    MUST BE RANK 1 THROUGH 10
+    =========================================
+    */
+
     for (
         let i = 0;
         i < 10;
@@ -692,11 +773,18 @@ function parseRankingMessage(message) {
         }
     }
 
-    // Player names must be unique
+    /*
+    =========================================
+    PLAYER NAMES MUST BE UNIQUE
+    =========================================
+    */
+
     const names =
         rankings.map(
             player =>
-                player.name.toLowerCase()
+                player.name
+                    .trim()
+                    .toLowerCase()
         );
 
     if (
@@ -704,6 +792,12 @@ function parseRankingMessage(message) {
     ) {
         return null;
     }
+
+    /*
+    =========================================
+    RETURN RECOVERED DATA
+    =========================================
+    */
 
     return rankings;
 }
