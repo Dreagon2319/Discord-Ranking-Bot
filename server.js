@@ -895,11 +895,6 @@ const commands = [
         .setName("showlist")
         .setDescription(
             "Show the existing ranking list again in the selected channel."
-        ),
-    new SlashCommandBuilder()
-        .setName("newcommand")
-        .setDescription(
-            "Show Nothing"
         )
 ].map(command =>
     command.toJSON()
@@ -1315,16 +1310,7 @@ client.on(
 
     return;
 }
-if (
-    interaction.commandName ===
-    "newcommand"
-) {
-    await interaction.reply({
-        content: "This command is working.",
-        ephemeral: true
-    });
-    return;
-}
+
                 /*
                 =========================================
                 /requestrank
