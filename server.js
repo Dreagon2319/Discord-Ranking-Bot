@@ -525,23 +525,6 @@ function applyMoveChange(
     );
 }
 
-/*
-    RECOVER DATA
-
-    IMPORTANT:
-    This function NO LONGER checks who authored
-    the message.
-
-    Therefore /recoverdata can recover from:
-    - Ranking Bot messages
-    - Admin messages
-    - Moderator messages
-    - Messages from other bots
-    - Any other user's message
-
-    The message still has to contain a valid
-    10-rank Ranking Bot style embed.
-*/
 function parseRankingMessage(message) {
     if (!message) {
         return null;
@@ -549,25 +532,13 @@ function parseRankingMessage(message) {
 
     let text = "";
 
-    /*
-    =========================================
-    READ NORMAL MESSAGE CONTENT
-    =========================================
-    */
-
+    // Normal message content
     if (typeof message.content === "string") {
         text += message.content + "\n";
     }
 
-    /*
-    =========================================
-    READ EMBED CONTENT
-    =========================================
-    */
-
-    if (
-        Array.isArray(message.embeds)
-    ) {
+    // Embed content
+    if (Array.isArray(message.embeds)) {
         for (const embed of message.embeds) {
 
             if (embed.title) {
@@ -578,9 +549,7 @@ function parseRankingMessage(message) {
                 text += embed.description + "\n";
             }
 
-            if (
-                Array.isArray(embed.fields)
-            ) {
+            if (Array.isArray(embed.fields)) {
                 for (const field of embed.fields) {
 
                     if (field.name) {
@@ -592,10 +561,6 @@ function parseRankingMessage(message) {
                     }
                 }
             }
-
-            if (embed.footer?.text) {
-                text += embed.footer.text + "\n";
-            }
         }
     }
 
@@ -604,108 +569,87 @@ function parseRankingMessage(message) {
     }
 
     /*
-    =========================================
-    CLEAN DISCORD FORMATTING
-    =========================================
+    Remove Discord markdown links.
+
+    [🥇](https://discord.com/assets/...)
+    becomes
+    🥇
+    */
+
+    text = text.replace(
+        /\[([^\]]+)\]\([^)]+\)/g,
+        "$1"
+    );
+
+    /*
+    Remove markdown formatting.
     */
 
     text = text
-        .replace(/\r/g, "")
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\*\*/g, "")
+        .replace(/__/g, "")
         .replace(/```/g, "")
         .replace(/`/g, "")
-        .replace(/\*\*/g, "")
-        .replace(/__/g, "");
+        .replace(/\r/g, "");
 
-    const rankings = [];
+    /*
+    Remove ranking emojis.
+    */
+
+    text = text.replace(
+        /[🥇🥈🥉🏅🏆]/g,
+        " "
+    );
 
     /*
     =========================================
-    READ EVERY LINE
+    FIND EACH RANK
+    =========================================
+
+    This works whether ranks are:
+
+    Rank 1 : aa
+    Rank 2 : Player002
+
+    OR:
+
+    Rank 1 : aa Rank 2 : Player002
     =========================================
     */
 
-    const lines = text.split("\n");
+    const rankRegex =
+        /Rank\s*(\d{1,2})\s*[:\-–—]\s*(.*?)(?=\s+Rank\s*\d{1,2}\s*[:\-–—]|$)/gi;
 
-    for (const rawLine of lines) {
+    const rankings = [];
 
-        let line = rawLine.trim();
+    let match;
 
-        if (!line) {
-            continue;
-        }
+    while (
+        (match = rankRegex.exec(text)) !== null
+    ) {
 
-        /*
-        Remove ranking medals.
+        const rank =
+            Number(match[1]);
 
-        Example:
-        🥇 Rank 1 : chris
-        🥈 Rank 2 : Melissa
-        🥉 Rank 3 : Solar
-        */
-
-        line = line.replace(
-            /^[🥇🥈🥉🏅🏆]\s*/,
-            ""
-        );
+        let name =
+            match[2].trim();
 
         /*
-        =========================================
-        FORMAT:
-
-        Rank 1 : chris
-        Rank 2 : Melissa
-        Rank 3 : Solar
-        =========================================
+        If this is Rank 10, remove any
+        footer text that may have been
+        copied after the player name.
         */
 
-        let match = line.match(
-            /^Rank\s*(\d{1,2})\s*:\s*(.+)$/i
-        );
+        name = name
+            .replace(
+                /\s*Ranking Bot.*$/i,
+                ""
+            )
+            .trim();
 
         /*
-        Also accept:
-
-        Rank 1 - chris
-        Rank 1 – chris
-        Rank 1 — chris
+        Ignore invalid ranks.
         */
-
-        if (!match) {
-            match = line.match(
-                /^Rank\s*(\d{1,2})\s*[-–—]\s*(.+)$/i
-            );
-        }
-
-        /*
-        Also accept:
-
-        #1 : chris
-        #1 - chris
-        #1 – chris
-        #1 — chris
-        */
-
-        if (!match) {
-            match = line.match(
-                /^#\s*(\d{1,2})\s*[:\-–—]\s*(.+)$/
-            );
-        }
-
-        if (!match) {
-            continue;
-        }
-
-        const rank = Number(match[1]);
-
-        /*
-        EVERYTHING AFTER THE SEPARATOR
-        IS THE PLAYER NAME.
-
-        No predefined names.
-        */
-
-        const name = match[2].trim();
 
         if (
             rank < 1 ||
@@ -716,7 +660,7 @@ function parseRankingMessage(message) {
         }
 
         /*
-        Do not allow the same rank twice.
+        Reject duplicate ranks.
         */
 
         if (
@@ -736,9 +680,7 @@ function parseRankingMessage(message) {
     }
 
     /*
-    =========================================
-    MUST HAVE EXACTLY 10 RANKS
-    =========================================
+    Must have exactly 10 ranks.
     */
 
     if (rankings.length !== 10) {
@@ -755,9 +697,7 @@ function parseRankingMessage(message) {
     );
 
     /*
-    =========================================
-    MUST BE RANK 1 THROUGH 10
-    =========================================
+    Must contain exactly Rank 1-10.
     */
 
     for (
@@ -774,9 +714,7 @@ function parseRankingMessage(message) {
     }
 
     /*
-    =========================================
-    PLAYER NAMES MUST BE UNIQUE
-    =========================================
+    Player names must be unique.
     */
 
     const names =
@@ -793,136 +731,8 @@ function parseRankingMessage(message) {
         return null;
     }
 
-    /*
-    =========================================
-    RETURN RECOVERED DATA
-    =========================================
-    */
-
     return rankings;
 }
-
-const commands = [
-    new SlashCommandBuilder()
-        .setName("setrole")
-        .setDescription(
-            "Set the role that can manage the ranking."
-        )
-        .addRoleOption(option =>
-            option
-                .setName("role")
-                .setDescription(
-                    "Role allowed to manage the ranking."
-                )
-                .setRequired(true)
-        )
-        .setDefaultMemberPermissions(
-            PermissionFlagsBits.Administrator
-        ),
-
-    new SlashCommandBuilder()
-        .setName("setchannel")
-        .setDescription(
-            "Set the channel where the ranking list is shown."
-        )
-        .addChannelOption(option =>
-            option
-                .setName("channel")
-                .setDescription(
-                    "Channel for the ranking list."
-                )
-                .addChannelTypes(
-                    ChannelType.GuildText
-                )
-                .setRequired(true)
-        )
-        .setDefaultMemberPermissions(
-            PermissionFlagsBits.Administrator
-        ),
-
-    new SlashCommandBuilder()
-        .setName("requestrank")
-        .setDescription(
-            "Request a new player ranking."
-        )
-        .addStringOption(option =>
-            option
-                .setName("name")
-                .setDescription(
-                    "New player name. It must not already be on the list."
-                )
-                .setRequired(true)
-        )
-        .addIntegerOption(option =>
-            option
-                .setName("rank")
-                .setDescription(
-                    "Rank from 1 to 10."
-                )
-                .setMinValue(1)
-                .setMaxValue(10)
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option
-                .setName("type")
-                .setDescription(
-                    "Ranking change type."
-                )
-                .addChoices(
-                    {
-                        name: "Between",
-                        value: "between"
-                    },
-                    {
-                        name: "Replace",
-                        value: "replace"
-                    }
-                )
-                .setRequired(true)
-        ),
-
-    new SlashCommandBuilder()
-        .setName("requestmove")
-        .setDescription(
-            "Request to move an existing player."
-        )
-        .addStringOption(option =>
-            option
-                .setName("name")
-                .setDescription(
-                    "Player name already on the list."
-                )
-                .setRequired(true)
-        )
-        .addIntegerOption(option =>
-            option
-                .setName("rank")
-                .setDescription(
-                    "Target rank from 1 to 10."
-                )
-                .setMinValue(1)
-                .setMaxValue(10)
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option
-                .setName("type")
-                .setDescription(
-                    "Move type."
-                )
-                .addChoices(
-                    {
-                        name: "Move",
-                        value: "move"
-                    },
-                    {
-                        name: "Replace",
-                        value: "replace"
-                    }
-                )
-                .setRequired(true)
-        ),
 
     new SlashCommandBuilder()
         .setName("setrank")
