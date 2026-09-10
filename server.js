@@ -897,7 +897,7 @@ const commands = [
             "Show the existing ranking list again in the selected channel."
         ),
     new SlashCommandBuilder()
-        .setName("NewCommand")
+        .setName("newcommand")
         .setDescription(
             "Show Nothing"
         )
@@ -1317,7 +1317,7 @@ client.on(
 }
 if (
     interaction.commandName ===
-    "NewCommand"
+    "newcommand"
 ) {
     await interaction.reply({
         content: "This command is working.",
