@@ -1318,7 +1318,13 @@ client.on(
 if (
     interaction.commandName ===
     "NewCommand"
-) { return; }
+) {
+    await interaction.reply({
+        content: "This command is working.",
+        ephemeral: true
+    });
+    return;
+}
                 /*
                 =========================================
                 /requestrank
