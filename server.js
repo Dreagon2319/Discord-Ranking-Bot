@@ -966,7 +966,12 @@ async function registerCommands() {
         );
     }
 }
-
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers
+    ]
+});
 client.once(
     "ready",
     async () => {
