@@ -532,36 +532,36 @@ function parseRankingMessage(message) {
 
     let text = "";
 
-    // Normal message content
-    if (typeof message.content === "string") {
-        text += message.content + "\n";
-    }
-
-    // Embed content
+    /*
+     * /showlist creates a Discord embed.
+     * The actual ranking list is stored in embed.description.
+     *
+     * We check ALL embeds so recovery also works if the message
+     * contains more than one embed.
+     */
     if (Array.isArray(message.embeds)) {
         for (const embed of message.embeds) {
-
-            if (embed.title) {
-                text += embed.title + "\n";
-            }
-
-            if (embed.description) {
-                text += embed.description + "\n";
-            }
-
-            if (Array.isArray(embed.fields)) {
-                for (const field of embed.fields) {
-
-                    if (field.name) {
-                        text += field.name + "\n";
-                    }
-
-                    if (field.value) {
-                        text += field.value + "\n";
-                    }
-                }
+            if (
+                typeof embed.description ===
+                "string"
+            ) {
+                text +=
+                    embed.description +
+                    "\n";
             }
         }
+    }
+
+    /*
+     * Also support a normal manually typed message.
+     */
+    if (
+        typeof message.content ===
+        "string"
+    ) {
+        text +=
+            message.content +
+            "\n";
     }
 
     if (!text.trim()) {
@@ -569,22 +569,8 @@ function parseRankingMessage(message) {
     }
 
     /*
-    Remove Discord markdown links.
-
-    [🥇](https://discord.com/assets/...)
-    becomes
-    🥇
-    */
-
-    text = text.replace(
-        /\[([^\]]+)\]\([^)]+\)/g,
-        "$1"
-    );
-
-    /*
-    Remove markdown formatting.
-    */
-
+     * Remove Discord markdown.
+     */
     text = text
         .replace(/\*\*/g, "")
         .replace(/__/g, "")
@@ -593,83 +579,94 @@ function parseRankingMessage(message) {
         .replace(/\r/g, "");
 
     /*
-    Remove ranking emojis.
-    */
-
+     * Remove Discord markdown links while keeping
+     * the visible text.
+     *
+     * Example:
+     * [🥇](some-url)
+     *
+     * becomes:
+     * 🥇
+     */
     text = text.replace(
-        /[🥇🥈🥉🏅🏆]/g,
-        " "
+        /\[([^\]]+)\]\([^)]+\)/g,
+        "$1"
     );
 
     /*
-    =========================================
-    FIND EACH RANK
-    =========================================
+     * Remove ranking emojis.
+     */
+    text = text.replace(
+        /[🥇🥈🥉🏅🏆]/g,
+        ""
+    );
 
-    This works whether ranks are:
-
-    Rank 1 : aa
-    Rank 2 : Player002
-
-    OR:
-
-    Rank 1 : aa Rank 2 : Player002
-    =========================================
-    */
-
-    const rankRegex =
-        /Rank\s*(\d{1,2})\s*[:\-–—]\s*(.*?)(?=\s+Rank\s*\d{1,2}\s*[:\-–—]|$)/gi;
+    /*
+     * IMPORTANT:
+     *
+     * /showlist creates one ranking per line:
+     *
+     * Rank 1 : Name
+     * Rank 2 : Name
+     * ...
+     * Rank 10 : Name
+     *
+     * Therefore parse each line independently.
+     *
+     * Everything after ":" is the player name.
+     */
+    const lines =
+        text.split("\n");
 
     const rankings = [];
 
-    let match;
+    for (const rawLine of lines) {
 
-    while (
-        (match = rankRegex.exec(text)) !== null
-    ) {
+        const line =
+            rawLine.trim();
+
+        const match =
+            line.match(
+                /^Rank\s*(\d{1,2})\s*[:\-–—]\s*(.+?)\s*$/i
+            );
+
+        if (!match) {
+            continue;
+        }
 
         const rank =
             Number(match[1]);
 
-        let name =
+        const name =
             match[2].trim();
 
         /*
-        If this is Rank 10, remove any
-        footer text that may have been
-        copied after the player name.
-        */
-
-        name = name
-            .replace(
-                /\s*Ranking Bot.*$/i,
-                ""
-            )
-            .trim();
-
-        /*
-        Ignore invalid ranks.
-        */
-
+         * Only Rank 1 through Rank 10.
+         */
         if (
             rank < 1 ||
-            rank > 10 ||
-            !name
+            rank > 10
         ) {
             continue;
         }
 
         /*
-        Reject duplicate ranks.
-        */
+         * Name cannot be empty.
+         */
+        if (!name) {
+            continue;
+        }
 
+        /*
+         * Every rank must occur exactly once.
+         */
         if (
             rankings.some(
                 player =>
                     player.rank === rank
             )
         ) {
-            continue;
+            return null;
         }
 
         rankings.push({
@@ -680,26 +677,26 @@ function parseRankingMessage(message) {
     }
 
     /*
-    Must have exactly 10 ranks.
-    */
-
-    if (rankings.length !== 10) {
+     * Must contain exactly 10 rankings.
+     */
+    if (
+        rankings.length !== 10
+    ) {
         return null;
     }
 
     /*
-    Sort by rank.
-    */
-
+     * Sort by rank.
+     */
     rankings.sort(
         (a, b) =>
             a.rank - b.rank
     );
 
     /*
-    Must contain exactly Rank 1-10.
-    */
-
+     * Require exactly:
+     * 1,2,3,4,5,6,7,8,9,10
+     */
     for (
         let i = 0;
         i < 10;
@@ -714,9 +711,8 @@ function parseRankingMessage(message) {
     }
 
     /*
-    Player names must be unique.
-    */
-
+     * Player names must be unique.
+     */
     const names =
         rankings.map(
             player =>
