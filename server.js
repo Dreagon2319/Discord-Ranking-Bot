@@ -734,6 +734,126 @@ function parseRankingMessage(message) {
     return rankings;
 }
 const commands = [
+        new SlashCommandBuilder()
+        .setName("setrole")
+        .setDescription(
+            "Set the role that can manage the ranking."
+        )
+        .addRoleOption(option =>
+            option
+                .setName("role")
+                .setDescription(
+                    "Role allowed to manage the ranking."
+                )
+                .setRequired(true)
+        )
+        .setDefaultMemberPermissions(
+            PermissionFlagsBits.Administrator
+        ),
+
+    new SlashCommandBuilder()
+        .setName("setchannel")
+        .setDescription(
+            "Set the channel where the ranking list is shown."
+        )
+        .addChannelOption(option =>
+            option
+                .setName("channel")
+                .setDescription(
+                    "Channel for the ranking list."
+                )
+                .addChannelTypes(
+                    ChannelType.GuildText
+                )
+                .setRequired(true)
+        )
+        .setDefaultMemberPermissions(
+            PermissionFlagsBits.Administrator
+        ),
+
+    new SlashCommandBuilder()
+        .setName("requestrank")
+        .setDescription(
+            "Request a new player ranking."
+        )
+        .addStringOption(option =>
+            option
+                .setName("name")
+                .setDescription(
+                    "New player name. It must not already be on the list."
+                )
+                .setRequired(true)
+        )
+        .addIntegerOption(option =>
+            option
+                .setName("rank")
+                .setDescription(
+                    "Rank from 1 to 10."
+                )
+                .setMinValue(1)
+                .setMaxValue(10)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName("type")
+                .setDescription(
+                    "Ranking change type."
+                )
+                .addChoices(
+                    {
+                        name: "Between",
+                        value: "between"
+                    },
+                    {
+                        name: "Replace",
+                        value: "replace"
+                    }
+                )
+                .setRequired(true)
+        ),
+
+    new SlashCommandBuilder()
+        .setName("requestmove")
+        .setDescription(
+            "Request to move an existing player."
+        )
+        .addStringOption(option =>
+            option
+                .setName("name")
+                .setDescription(
+                    "Player name already on the list."
+                )
+                .setRequired(true)
+        )
+        .addIntegerOption(option =>
+            option
+                .setName("rank")
+                .setDescription(
+                    "Target rank from 1 to 10."
+                )
+                .setMinValue(1)
+                .setMaxValue(10)
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option
+                .setName("type")
+                .setDescription(
+                    "Move type."
+                )
+                .addChoices(
+                    {
+                        name: "Move",
+                        value: "move"
+                    },
+                    {
+                        name: "Replace",
+                        value: "replace"
+                    }
+                )
+                .setRequired(true)
+        ),
 
     new SlashCommandBuilder()
         .setName("setrank")
