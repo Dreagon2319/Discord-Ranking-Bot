@@ -547,112 +547,156 @@ function parseRankingMessage(message) {
         return null;
     }
 
-    /*
-        REMOVED:
+    let text = "";
 
-        if (
-            !client.user ||
-            message.author?.id !== client.user.id
-        ) {
-            return null;
-        }
-
-        This was the restriction that allowed
-        recovery only from Ranking Bot messages.
-    */
-
-    if (!message.embeds?.length) {
-        return null;
+    // Read normal Discord message text
+    if (message.content) {
+        text += message.content + "\n";
     }
 
-    const embed =
-        message.embeds[0];
-
+    // Also read embeds
     if (
-        embed.title !==
-        "🏆 SERVER RANKING"
+        message.embeds &&
+        message.embeds.length > 0
     ) {
+        for (const embed of message.embeds) {
+            if (embed.title) {
+                text += embed.title + "\n";
+            }
+
+            if (embed.description) {
+                text += embed.description + "\n";
+            }
+
+            if (
+                embed.fields &&
+                embed.fields.length > 0
+            ) {
+                for (const field of embed.fields) {
+                    if (field.name) {
+                        text += field.name + "\n";
+                    }
+
+                    if (field.value) {
+                        text += field.value + "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    if (!text.trim()) {
         return null;
     }
 
-    if (!embed.description) {
-        return null;
-    }
-
-    const lines =
-        embed.description
-            .split("\n")
-            .map(line => line.trim())
-            .filter(Boolean);
+    // Remove Discord markdown formatting
+    text = text
+        .replace(/\r/g, "")
+        .replace(/\*\*/g, "")
+        .replace(/__/g, "")
+        .replace(/`/g, "");
 
     const rankings = [];
+    const lines = text.split("\n");
 
-    for (const line of lines) {
-        const cleaned =
-            line
-                .replace(
-                    /^🥇\s*/,
-                    ""
-                )
-                .replace(
-                    /^🥈\s*/,
-                    ""
-                )
-                .replace(
-                    /^🥉\s*/,
-                    ""
-                );
+    for (const rawLine of lines) {
+        let line = rawLine.trim();
 
-        const match =
-            cleaned.match(
-                /^\*\*Rank\s+(\d+)\s*:\s*(.*?)\*\*$/
-            );
-
-        if (!match) {
-            return null;
+        if (!line) {
+            continue;
         }
 
-        const rank =
-            Number(match[1]);
+        // Remove Discord emoji links such as [🥇](https://...)
+        line = line.replace(
+            /\[([^\]]+)\]\([^)]+\)/g,
+            "$1"
+        );
 
-        const name =
-            match[2].trim();
+        // Remove ranking emojis
+        line = line.replace(
+            /^[🥇🥈🥉🏅🏆]\s*/,
+            ""
+        );
+
+        let match = null;
+
+        // Format:
+        // Rank 1 : chris
+        match = line.match(
+            /^Rank\s*(\d{1,2})\s*[:\-–—]\s*(.+)$/i
+        );
+
+        // Format:
+        // #1 — chris
+        // #1 - chris
+        // #1 – chris
+        if (!match) {
+            match = line.match(
+                /^#\s*(\d{1,2})\s*[-–—:]\s*(.+)$/
+            );
+        }
+
+        if (!match) {
+            continue;
+        }
+
+        const rank = Number(match[1]);
+        let name = match[2].trim();
 
         if (
-            !Number.isInteger(rank) ||
             rank < 1 ||
             rank > 10 ||
             !name
         ) {
-            return null;
+            continue;
         }
 
-        rankings[rank - 1] = {
-            name,
+        // Prevent duplicate ranks
+        if (
+            rankings.some(
+                player =>
+                    player.rank === rank
+            )
+        ) {
+            continue;
+        }
+
+        rankings.push({
+            rank: rank,
+            name: name,
             userId: null
-        };
+        });
     }
 
+    // Must have exactly 10 players
     if (rankings.length !== 10) {
         return null;
     }
 
+    rankings.sort(
+        (a, b) =>
+            a.rank - b.rank
+    );
+
+    // Must contain ranks 1 through 10
     for (
-        let index = 0;
-        index < 10;
-        index++
+        let i = 0;
+        i < 10;
+        i++
     ) {
-        if (!rankings[index]) {
+        if (
+            rankings[i].rank !==
+            i + 1
+        ) {
             return null;
         }
     }
 
+    // Player names must be unique
     const names =
         rankings.map(
             player =>
-                player.name
-                    .trim()
-                    .toLowerCase()
+                player.name.toLowerCase()
         );
 
     if (
@@ -663,13 +707,6 @@ function parseRankingMessage(message) {
 
     return rankings;
 }
-
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers
-    ]
-});
 
 const commands = [
     new SlashCommandBuilder()
@@ -1806,172 +1843,175 @@ client.on(
 
                     return;
                 }
+/*
+=========================================
+/recoverdata
+=========================================
+*/
 
-                /*
-                =========================================
-                /recoverdata
-                =========================================
-                */
+if (
+    interaction.commandName ===
+    "recoverdata"
+) {
+    if (
+        !hasManagerRole(
+            interaction.member,
+            server
+        )
+    ) {
+        await interaction.reply({
+            content:
+                "❌ Only members with the configured ranking manager role can use this command.",
+            ephemeral: true
+        });
 
-                if (
-                    interaction.commandName ===
-                    "recoverdata"
-                ) {
-                    if (
-                        !hasManagerRole(
-                            interaction.member,
-                            server
-                        )
-                    ) {
-                        await interaction.reply({
-                            content:
-                                "❌ Only members with the configured ranking manager role can use this command.",
-                            ephemeral: true
-                        });
+        return;
+    }
 
-                        return;
-                    }
+    const link =
+        interaction.options
+            .getString("data")
+            .trim();
 
-                    const link =
-                        interaction.options
-                            .getString(
-                                "data"
-                            )
-                            .trim();
+    // Accept normal, canary, PTB and discordapp links
+    const match =
+        link.match(
+            /^https?:\/\/(?:canary\.)?(?:ptb\.)?discord(?:app)?\.com\/channels\/(\d+)\/(\d+)\/(\d+)(?:\?.*)?$/
+        );
 
-                    const match =
-                        link.match(
-                            /^https?:\/\/(?:canary\.)?(?:ptb\.)?discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)\/?$/
-                        );
+    if (!match) {
+        await interaction.reply({
+            content:
+                "❌ Invalid message link. Just copy the Discord message link and paste it into `data`.",
+            ephemeral: true
+        });
 
-                    if (!match) {
-                        await interaction.reply({
-                            content:
-                                "❌ Invalid message link. Just copy the old ranking-list message link and paste it into `data`.",
-                            ephemeral: true
-                        });
+        return;
+    }
 
-                        return;
-                    }
+    const linkedGuildId =
+        match[1];
 
-                    const linkedGuildId =
-                        match[1];
+    const linkedChannelId =
+        match[2];
 
-                    const linkedChannelId =
-                        match[2];
+    const linkedMessageId =
+        match[3];
 
-                    const linkedMessageId =
-                        match[3];
+    // Make sure the message belongs to this server
+    if (
+        linkedGuildId !==
+        guild.id
+    ) {
+        await interaction.reply({
+            content:
+                "❌ The message link must belong to this server.",
+            ephemeral: true
+        });
 
-                    if (
-                        linkedGuildId !==
-                        guild.id
-                    ) {
-                        await interaction.reply({
-                            content:
-                                "❌ The message link must belong to this server.",
-                            ephemeral: true
-                        });
+        return;
+    }
 
-                        return;
-                    }
+    // Fetch the channel
+    const linkedChannel =
+        await guild.channels
+            .fetch(
+                linkedChannelId
+            )
+            .catch(
+                () => null
+            );
 
-                    const linkedChannel =
-                        await guild.channels
-                            .fetch(
-                                linkedChannelId
-                            )
-                            .catch(
-                                () => null
-                            );
+    if (
+        !linkedChannel ||
+        !linkedChannel.isTextBased()
+    ) {
+        await interaction.reply({
+            content:
+                "❌ The linked channel could not be found. Make sure the bot can view that channel.",
+            ephemeral: true
+        });
 
-                    if (
-                        !linkedChannel ||
-                        !linkedChannel.isTextBased()
-                    ) {
-                        await interaction.reply({
-                            content:
-                                "❌ The linked channel could not be found.",
-                            ephemeral: true
-                        });
+        return;
+    }
 
-                        return;
-                    }
+    // Fetch the message
+    const linkedMessage =
+        await linkedChannel.messages
+            .fetch(
+                linkedMessageId
+            )
+            .catch(
+                () => null
+            );
 
-                    const linkedMessage =
-                        await linkedChannel.messages
-                            .fetch(
-                                linkedMessageId
-                            )
-                            .catch(
-                                () => null
-                            );
+    if (!linkedMessage) {
+        await interaction.reply({
+            content:
+                "❌ The linked message could not be found. Make sure the bot has Read Message History permission.",
+            ephemeral: true
+        });
 
-                    if (!linkedMessage) {
-                        await interaction.reply({
-                            content:
-                                "❌ The linked message could not be found.",
-                            ephemeral: true
-                        });
+        return;
+    }
 
-                        return;
-                    }
+    // Parse the ranking
+    const recovered =
+        parseRankingMessage(
+            linkedMessage
+        );
 
-                    /*
-                        The important change is inside
-                        parseRankingMessage().
+    if (!recovered) {
+        await interaction.reply({
+            content:
+                "❌ Recovery failed. The linked message must contain exactly 10 valid ranking entries from Rank 1 through Rank 10.",
+            ephemeral: true
+        });
 
-                        The author of this message does
-                        NOT need to be Ranking Bot.
-                    */
+        return;
+    }
 
-                    const recovered =
-                        parseRankingMessage(
-                            linkedMessage
-                        );
+    // Save recovered ranking
+    server.rankings =
+        normalizeRanking(
+            recovered
+        );
 
-                    if (!recovered) {
-                        await interaction.reply({
-                            content:
-                                "❌ Recovery failed. The linked message does not contain a valid 10-player ranking list.",
-                            ephemeral: true
-                        });
+    // Make sure requests exists
+    if (
+        !server.requests ||
+        typeof server.requests !==
+        "object"
+    ) {
+        server.requests = {};
+    }
 
-                        return;
-                    }
+    saveData();
 
-                    server.rankings =
-                        normalizeRanking(
-                            recovered
-                        );
+    // Update the active ranking message
+    const rankingMessage =
+        await updateRankingMessage(
+            guild
+        );
 
-                    saveData();
+    if (!rankingMessage) {
+        await interaction.reply({
+            content:
+                "❌ The ranking data was recovered, but the selected ranking channel could not be updated.",
+            ephemeral: true
+        });
 
-                    const rankingMessage =
-                        await updateRankingMessage(
-                            guild
-                        );
+        return;
+    }
 
-                    if (!rankingMessage) {
-                        await interaction.reply({
-                            content:
-                                "❌ The ranking data was recovered, but the selected ranking channel could not be updated.",
-                            ephemeral: true
-                        });
+    await interaction.reply({
+        content:
+            "✅ Ranking data successfully recovered from the linked message.",
+        ephemeral: true
+    });
 
-                        return;
-                    }
-
-                    await interaction.reply({
-                        content:
-                            "✅ Ranking data successfully recovered from the linked ranking-list message.",
-                        ephemeral: true
-                    });
-
-                    return;
-                }
-            }
-
+    return;
+}
             /*
             =========================================
             BUTTON INTERACTIONS
