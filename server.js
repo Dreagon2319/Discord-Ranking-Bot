@@ -733,6 +733,7 @@ function parseRankingMessage(message) {
 
     return rankings;
 }
+const commands = [
 
     new SlashCommandBuilder()
         .setName("setrank")
